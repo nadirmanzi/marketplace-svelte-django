@@ -1,0 +1,97 @@
+/* Fonts */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@fontsource-variable/nunito';
+/* @import '@fontsource-variable/nunito-sans'; */
+/* @import '@fontsource-variable/montserrat'; */
+/* @import '@fontsource/poppins'; */
+@import '@fontsource-variable/inter';
+
+/* Plugins */
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/typography';
+
+@theme {
+	/* main backgrounds */
+	--color-background: oklch(100% 0 0);
+	--color-background-secondary: oklch(96% 0 0);
+
+	/* main foregrounds */
+	--color-foreground: oklch(20% 0 0);
+	--color-foreground-secondary: oklch(50% 0 0);
+
+	/* navigation */
+	--color-nav-background: var(--color-background);
+	--color-nav-border: var(--color-border);
+	--color-nav-foreground: var(--color-foreground);
+	--color-nav-foreground-secondary: var(--color-foreground-secondary);
+	--color-nav-hover-background: var(--color-ghost);
+
+	/* COLORS */
+	/* primary */
+	--color-primary: oklch(65% 0.2176 38);
+	--color-primary-foreground: #ffffff;
+	--color-primary-hover: oklch(60% 0.2176 38);
+	--color-primary-active: oklch(55% 0.2176 38);
+
+	/* secondary */
+	--color-secondary: oklch(23% 0 0);
+	--color-secondary-foreground: #ffffff;
+	--color-secondary-hover: oklch(28% 0 0);
+	--color-secondary-active: oklch(33% 0 0);
+	--color-text-secondary: oklch(50% 0 0);
+
+	/* ghost */
+	--color-ghost: oklch(96% 0 0);
+	--color-ghost-active: oklch(90% 0 0);
+	--color-ghost-secondary: oklch(89% 0 0);
+	--color-ghost-secondary-active: oklch(84% 0 0);
+
+	/* destructive */
+	--color-destructive: oklch(54% 0.221 29.2);
+	--color-destructive-foreground: #ffffff;
+	--color-destructive-hover: oklch(49% 0.221 29.2);
+	--color-destructive-active: oklch(44% 0.221 29.2);
+
+	/* success */
+	--color-success: oklch(66% 0.2127 139.8);
+	--color-success-foreground: #ffffff;
+	--color-success-hover: oklch(61% 0.2127 139.8);
+	--color-success-active: oklch(56% 0.2127 139.8);
+
+	--color-separator: oklch(85% 0 0);
+
+	/* main borders */
+	--color-border: oklch(95% 0 0);
+	--color-border-secondary: oklch(90% 0 0);
+
+	/* text sizes */
+	--text-sm: 0.85rem;
+
+	/* input */
+	--color-input-background: oklch(100% 0 0);
+	--color-input-foreground: var(--color-foreground);
+	--color-input-placeholder: oklch(60% 0 0);
+	--color-input-border: oklch(90% 0 0);
+	--color-input-ring: oklch(85% 0 0);
+	--color-input-hover: oklch(98% 0 0);
+	--color-input-focus: oklch(98% 0 0);
+}
+
+@layer base {
+	body {
+		font-family: 'Inter Variable', sans-serif;
+		color: var(--color-foreground);
+		font-weight: 400;
+	}
+
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		font-family: 'Nunito Variable', sans-serif;
+		font-weight: 600;
+	}
+}
