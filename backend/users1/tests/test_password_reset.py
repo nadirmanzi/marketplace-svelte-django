@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 
-from users.services.password_reset_service import PasswordResetService
+from users1.services.password_reset_service import PasswordResetService
 
 
 User = get_user_model()

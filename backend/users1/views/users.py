@@ -3,17 +3,17 @@ from django.contrib.auth import get_user_model
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
-from users.throttling import (
+from users1.throttling import (
     RegistrationRateThrottle,
     UserActionThrottle,
 )
-from users.filters import UserFilter
-from users.serializers import (
+from users1.filters import UserFilter
+from users1.serializers import (
     ReadOnlyUserSerializer,
     RegisterSerializer,
     UpdateUserSerializer,
 )
-from users.utils.permission_utils import can_access_user
+from users1.utils.permission_utils import can_access_user
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer_class: ReadOnlyUserSerializer (default for retrieve/list)
         lookup_field: 'user_id' (UUID primary key)
         filterset_class: UserFilter (15+ filter fields)
-        ordering_fields: created_at, email, first_name, last_name, last_updated
+        ordering_fields: created_at, email, first_name, last_name, updated_at
         ordering: '-created_at' (newest first)
     """
 
@@ -55,7 +55,7 @@ class UserViewSet(viewsets.ModelViewSet):
     filterset_class = UserFilter
     ordering_fields = [
         "created_at",
-        "last_updated",
+        "updated_at",
         "email",
         "first_name",
         "last_name",
@@ -73,21 +73,10 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """Define permission classes based on the current action."""
-        if self.action == "create":
+        if self.action in ['create', 'list', 'destryo']:
             # Registration is restricted to admins (public signup via AllAuth)
             permission_classes = [IsAdminUser]
-        elif self.action == "list":
-            # List all users - staff only
-            permission_classes = [IsAdminUser]
-        elif self.action in ["retrieve", "update", "partial_update", "destroy"]:
-            # Get/update own profile - owner or staff
-            # Hard delete (destroy) - staff only (but managed via check_object_permissions or separate check?)
-            # The original code said "DELETE /users/{id}/ -> Hard delete user (IsAuthenticated, staff only)"
-            # But the logic block in original `get_permissions` for 'retrieve', 'update', 'partial_update' was [IsAuthenticated]
-            # It didn't mention 'destroy'. 'destroy' would fall to the `else` block which was `[IsAuthenticated]`.
-            # I will trust the original logic which allowed `destroy` to pass initial perm check and fail at object level if needed
-            # Or reliance on IsAdminUser for list implies typical admin usage.
-            # Actually, `check_object_permissions` enforces "can_access_user".
+        elif self.action in ["retrieve", "update", "partial_update"]:
             permission_classes = [IsAuthenticated]
         else:
             # Custom actions (if any added later) - authenticated users
@@ -104,7 +93,7 @@ class UserViewSet(viewsets.ModelViewSet):
         """Filter queryset based on user's permissions and authentication status."""
         user = self.request.user
         if user.is_authenticated:
-            if user.is_staff:
+            if(user.has_perm('view_user') and user.is_staff) or user.is_superuser:
                 # Staff can see all users
                 return User.objects.all_objects()
             else:

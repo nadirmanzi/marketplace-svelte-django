@@ -1,4 +1,4 @@
-from config.logging import LOGGING  # noqa: F401
+from config.logging import LOGGING
 from pathlib import Path
 import datetime
 import os
@@ -18,6 +18,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # 2. If running production settings, load .env.production
 # 3. If running local settings, load .env.local
 # 4. Fallback to .env
+
+LOGGING = LOGGING
 
 
 def get_env_file(base_dir):
@@ -75,26 +77,19 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
-    # Allauth apps
-    "allauth",
-    "allauth.account",
-    "allauth.headless",
-    "allauth.socialaccount",
-    "allauth.socialaccount.providers.google",
     # Other apps
     "corsheaders",
     "django_filters",
     "drf_spectacular",
     # Core apps
     "users",
-    "products",
+    # "products",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -173,7 +168,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=True)
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = (
     *default_headers,
@@ -182,8 +177,10 @@ CORS_ALLOW_HEADERS = (
     "x-password-reset-key",
 )
 
+# Auth user model
 AUTH_USER_MODEL = "users.User"
 
+# DRF configurations
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "users.authentication.CustomJWTAuthentication",
@@ -196,15 +193,27 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/min",
+        "anon": "1000/hour",
         "user": "100/min",
         "login": "5/min",
         "register": "5/min",
-        "email_verification": "100/hour",
-        "password_reset": "2/hour",
     },
 }
 
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=10),
+    "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "USER_ID_FIELD": "user_id",  # DB field name
+    "USER_ID_CLAIM": "user_id",  # JWT claim name
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "UPDATE_LAST_LOGIN": False,
+}
+
+# Spectacular configurations
 SPECTACULAR_SETTINGS = {
     "TITLE": "Marketplace API",
     "DESCRIPTION": "API schema for the Marketplace project.",
@@ -213,96 +222,14 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
 }
 
-SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=10),
-    "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=1),
-    # Token rotation: When enabled, old refresh tokens are blacklisted and new ones issued
-    # on each refresh. This prevents token reuse attacks. The CustomHeadlessAdapter
-    # ensures rotated refresh tokens are included in API responses.
-    "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
-    "AUTH_HEADER_TYPES": ("Bearer",),
-    "USER_ID_FIELD": "user_id",
+PASSWORD_EXPIRATION_MIDDLEWARE = {
+    "EXEMPT_URL_NAMES": [
+        "user-login",
+        "user-register",
+        "user-logout",
+        "user-token_refresh",
+    ],
+    "EXEMPT_URL_PREFIXES": ["/admin/", "/schema/", "/static/", "/media/"],
+    "EXEMPT_SUPERUSERS": True,  # Whether to exempt superusers
+    "WARNING_DAYS": 7,  # Days before expiry to start warning
 }
-
-# Enforce single active session per user
-SINGLE_ACTIVE_SESSION = False
-
-# Email Configuration
-# Defaults; overridden in environment specific settings
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = env("EMAIL_HOST", default="smtp.gmail.com")
-EMAIL_PORT = env.int("EMAIL_PORT", default=587)
-EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
-EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
-
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@marketplace.com")
-
-# Email Verification Token Expiration (in seconds)
-EMAIL_VERIFICATION_TOKEN_EXPIRY = 5 * 60 * 60  # 5 hours
-
-AUTHENTICATION_BACKENDS = [
-    # Needed to login by username in Django admin, regardless of `allauth`
-    "django.contrib.auth.backends.ModelBackend",
-    # `allauth` specific authentication methods, such as login by email
-    "allauth.account.auth_backends.AuthenticationBackend",
-]
-
-# AllAuth
-HEADLESS_ONLY = True
-REST_USE_JWT = True
-JWT_AUTH_COOKIE = None
-JWT_AUTH_REFRESH_COOKIE = None
-SITE_ID = 1
-
-# Allauth Headless Configuration
-# Custom adapter supports token rotation by including rotated refresh tokens in responses
-HEADLESS_ADAPTER = "users.adapters.CustomHeadlessAdapter"
-HEADLESS_TOKEN_STRATEGY = "users.allauth_strategy.SimpleJWTTokenStrategy"
-HEADLESS_SERVE_TOKEN_AS = "header"  # No cookies, header only
-HEADLESS_CLIENT = "app"  # 'app' or 'browser', 'app' typically implies no session cookies for auth state
-ALLAUTH_HEADLESS_CLIENTS = {
-    "app": {
-        "token_strategy": "users.allauth_strategy.SimpleJWTTokenStrategy",
-    }
-}
-
-# Custom account adapter for account lockout integration with AllAuth
-ACCOUNT_ADAPTER = "users.adapters.CustomAccountAdapter"
-
-# Allauth account settings
-# Authentication method: email-only (no username)
-ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_USER_MODEL_USERNAME_FIELD = None
-
-# Signup configuration
-# Use custom signup form to handle phone number and name fields
-ACCOUNT_FORMS = {
-    "signup": "users.forms.CustomSignupForm",
-}
-
-# Email verification: mandatory for security
-ACCOUNT_EMAIL_VERIFICATION = "mandatory"
-ACCOUNT_UNIQUE_EMAIL = True
-
-# Password requirements (Django validators handle complexity)
-ACCOUNT_PASSWORD_MIN_LENGTH = 8
-
-# Session management (for API/headless, no session cookies)
-ACCOUNT_SESSION_REMEMBER = None  # Not applicable in headless mode
-ACCOUNT_LOGOUT_ON_GET = False  # API should use POST for logout
-
-HEADLESS_FRONTEND_URLS = {
-    "account_confirm_email": f"{env('FRONTEND_URL')}/auth/v1/verify-email/{{key}}",
-    "account_reset_password_from_key": f"{env('FRONTEND_URL')}/auth/v1/password/reset/{{key}}",
-    "account_signup": f"{env('FRONTEND_URL')}/auth/v1/signup",
-}
-
-# Account Lockout Configuration
-ACCOUNT_LOCKOUT_ENABLED = True
-ACCOUNT_LOCKOUT_THRESHOLD = 5  # Failed attempts before lockout
-ACCOUNT_LOCKOUT_DURATION_MINUTES = 15  # Lockout duration
-ACCOUNT_LOCKOUT_TRACK_IP = True  # Enable IP tracking
-ACCOUNT_LOCKOUT_IP_THRESHOLD = 10  # IP lockout threshold
-ACCOUNT_LOCKOUT_IP_DURATION_MINUTES = 30  # IP lockout duration

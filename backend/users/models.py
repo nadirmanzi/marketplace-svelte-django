@@ -27,26 +27,6 @@ from django.core.validators import validate_email
 from .managers import UserManager
 from users.utils.validators import normalize_email, validate_and_normalize_phone
 
-
-EMAIL_VERIFICATION_PENDING = "pending"
-EMAIL_VERIFICATION_VERIFIED = "verified"
-
-EMAIL_VERIFICATION_CHOICES = [
-    (EMAIL_VERIFICATION_PENDING, "Pending"),
-    (EMAIL_VERIFICATION_VERIFIED, "Verified"),
-]
-
-TELEPHONE_VERIFICATION_PENDING = "pending"
-TELEPHONE_VERIFICATION_VERIFIED = "verified"
-TELEPHONE_VERIFICATION_NONE = "no_number"
-
-TELEPHONE_VERIFICATION_CHOICES = [
-    (TELEPHONE_VERIFICATION_PENDING, "Pending"),
-    (TELEPHONE_VERIFICATION_VERIFIED, "Verified"),
-    (TELEPHONE_VERIFICATION_NONE, "No number"),
-]
-
-
 class User(AbstractBaseUser, PermissionsMixin):
     """
     Custom user model:
@@ -64,24 +44,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         max_length=254,
     )
 
-    first_name = models.CharField(max_length=75)
-    last_name = models.CharField(max_length=75)
+    full_name = models.CharField(max_length=255)
     telephone_number = models.CharField(
         max_length=32, unique=True, null=True, blank=True, db_index=True
-    )
-
-    # Verification status
-    email_verification_status = models.CharField(
-        max_length=16,
-        choices=EMAIL_VERIFICATION_CHOICES,
-        default=EMAIL_VERIFICATION_PENDING,
-        db_index=True,
-    )
-    telephone_verification_status = models.CharField(
-        max_length=16,
-        choices=TELEPHONE_VERIFICATION_CHOICES,
-        default=TELEPHONE_VERIFICATION_NONE,
-        db_index=True,
     )
 
     # Account status
@@ -89,33 +54,21 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False, db_index=True)
     is_superuser = models.BooleanField(default=False, db_index=True)
     is_soft_deleted = models.BooleanField(default=False, db_index=True)
-    deleted_at = models.DateTimeField(null=True, blank=True)
-
-    # Preferences
-    locale = models.CharField(max_length=10, null=True, blank=True)
+    soft_deleted_at = models.DateTimeField(null=True, blank=True)
 
     # Session tracking
     password_changed_at = models.DateTimeField(null=True, blank=True)
     password_expires_in_days = models.PositiveIntegerField(default=90)
     session_version = models.IntegerField(default=0)
 
-    # Account lockout tracking
-    failed_login_attempts = models.PositiveIntegerField(default=0, db_index=True)
-    locked_until = models.DateTimeField(null=True, blank=True, db_index=True)
-    locked_at = models.DateTimeField(null=True, blank=True)
-
     # Audit
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    last_updated = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     objects = UserManager()
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["first_name", "last_name", "telephone_number"]
-
-    @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}"
+    REQUIRED_FIELDS = ["full_name", "telephone_number"]
 
     @property
     def password_expired(self):
@@ -124,20 +77,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         return timezone.now() > (
             self.password_changed_at + timedelta(days=self.password_expires_in_days)
         )
-
-    @property
-    def is_locked(self):
-        """Check if account is currently locked due to failed login attempts."""
-        if not self.locked_until:
-            return False
-        return timezone.now() < self.locked_until
-
-    def reset_failed_attempts(self):
-        """Reset failed login attempts and clear lockout status."""
-        self.failed_login_attempts = 0
-        self.locked_until = None
-        self.locked_at = None
-        self.save(update_fields=["failed_login_attempts", "locked_until", "locked_at"])
 
     class Meta:
         ordering = ["-created_at"]
@@ -148,9 +87,14 @@ class User(AbstractBaseUser, PermissionsMixin):
                 name="unique_active_telephone_number",
             )
         ]
+        permissions = [
+            ("can_soft_delete_user", "Can soft delete a user"),
+            ("can_deactivate_user", "Can deactivate a user"),
+            ("can_activate_user", "Can activate a user"),
+        ]
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} <{self.email}>"
+        return f"{self.full_name} <{self.email}>"
 
     def clean(self):
         """Validate email and phone format.
@@ -189,7 +133,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.email = normalize_email(self.email)
 
         # Name normalization: strip whitespace from first/last names.
-        for field in ["first_name", "last_name"]:
+        for field in ["full_name"]:
             value = getattr(self, field)
             if value:
                 setattr(self, field, value.strip())
@@ -212,67 +156,37 @@ class User(AbstractBaseUser, PermissionsMixin):
             # When marking user as soft-deleted:
             # 1. Record deletion timestamp (preserve audit trail of when deletion occurred)
             # 2. Set is_active=False (prevents login, excluded from active user queries)
-            self.deleted_at = self.deleted_at or timezone.now()
+            self.soft_deleted_at = self.soft_deleted_at or timezone.now()
             self.is_active = False
         else:
             # When un-deleting (is_soft_deleted=False):
             # Clear the deletion timestamp so user can be fully reactivated later.
-            self.deleted_at = None
+            self.soft_deleted_at = None
 
         super().save(*args, **kwargs)
 
     def set_password(self, raw_password):
         """Hash password and update session tracking (does not save).
-
+        
         Args:
             raw_password (str): The plaintext password to hash and store.
-
+        
         Side Effects:
             - Hashes password using Django's password hashing algorithm.
-            - Updates password_changed_at to current timestamp (forces re-authentication).
-            - Increments session_version (invalidates all existing sessions for forced logout).
+            - Updates password_changed_at to current timestamp.
+            - Increments session_version ONLY on password changes (not initial set).
         """
-        # Hash the password using Django's make_password utility for consistent hashing.
+        # Check if this is a password change vs initial set
+        is_password_change = bool(self.password)
+        
+        # Hash the password
         self.password = make_password(raw_password)
-        # Record timestamp to track when user changed password (useful for security audits).
+        
+        # Always update timestamp (useful for password expiration)
         self.password_changed_at = timezone.now()
-        # Increment session version to invalidate all active sessions, forcing re-login
-        # when passwords change or suspicious activity is detected.
-        self.session_version += 1
+        
+        # Only increment session version on actual password changes
+        # This invalidates existing tokens when password changes
+        if is_password_change:
+            self.session_version += 1
 
-
-class FailedLoginAttempt(models.Model):
-    """
-    Track failed login attempts per IP address for account lockout protection.
-
-    This model stores IP-based lockout information separately from user accounts
-    to prevent brute force attacks from specific IP addresses across multiple accounts.
-    """
-
-    ip_address = models.CharField(
-        max_length=45, unique=True, db_index=True
-    )  # IPv6 max length
-    failed_attempts = models.PositiveIntegerField(default=0, db_index=True)
-    locked_until = models.DateTimeField(null=True, blank=True, db_index=True)
-    last_attempt_at = models.DateTimeField(auto_now=True, db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-
-    class Meta:
-        ordering = ["-last_attempt_at"]
-        indexes = [
-            models.Index(fields=["ip_address"]),
-            models.Index(fields=["locked_until"]),
-            models.Index(fields=["last_attempt_at"]),
-        ]
-
-    def __str__(self):
-        return (
-            f"FailedLoginAttempt: {self.ip_address} ({self.failed_attempts} attempts)"
-        )
-
-    @property
-    def is_locked(self):
-        """Check if IP is currently locked."""
-        if not self.locked_until:
-            return False
-        return timezone.now() < self.locked_until

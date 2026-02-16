@@ -18,7 +18,7 @@ from datetime import timedelta
 
 from ..models import FailedLoginAttempt
 from config.logging import audit_log
-from users.utils.network import get_client_ip
+from users1.utils.network import get_client_ip
 from django.db.models import F
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
 import unittest
 
-from users.utils.permission_utils import can_access_user, can_reactivate_user
+from users1.utils.permission_utils import can_access_user, can_reactivate_user
 
 
 class DummyUser:

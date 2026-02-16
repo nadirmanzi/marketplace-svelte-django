@@ -5,11 +5,11 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from users.services.user_service import UserLifecycleService
-from users.services.account_lockout_service import AccountLockoutService
+from users1.services.user_service import UserLifecycleService
+from users1.services.account_lockout_service import AccountLockoutService
 from config.logging import audit_log
-from users.serializers import ReadOnlyUserSerializer
-from users.utils.permission_utils import can_access_user
+from users1.serializers import ReadOnlyUserSerializer
+from users1.utils.permission_utils import can_access_user
 
 logger = logging.getLogger(__name__)
 User = get_user_model()

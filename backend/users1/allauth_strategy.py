@@ -43,9 +43,9 @@ Integration Points:
 - Custom Adapter: Reads rotated refresh token from request and includes in response
 """
 
-from allauth.headless.tokens.base import AbstractTokenStrategy
-from users.tokens import CustomAccessToken, CustomRefreshToken
-from users.services.token_service import TokenService
+from allauth.headless.tokens.strategies.base import AbstractTokenStrategy
+from users1.tokens import CustomAccessToken, CustomRefreshToken
+from users1.services.token_service import TokenService
 
 from django.conf import settings
 

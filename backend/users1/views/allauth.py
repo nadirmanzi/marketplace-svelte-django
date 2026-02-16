@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 from allauth.headless.account import views as allauth_views
-from users.throttling import (
+from users1.throttling import (
     LoginRateThrottle,
     RegistrationRateThrottle,
     PasswordResetRateThrottle,

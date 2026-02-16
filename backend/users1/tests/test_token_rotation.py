@@ -6,8 +6,8 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 
-from users.services.token_service import TokenService
-from users.tokens import CustomRefreshToken
+from users1.services.token_service import TokenService
+from users1.tokens import CustomRefreshToken
 
 
 User = get_user_model()

@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from users.utils.token_utils import get_current_utc, make_datetime_aware, is_token_expired
+from users1.utils.token_utils import get_current_utc, make_datetime_aware, is_token_expired
 
 
 class TestTokenUtils(unittest.TestCase):

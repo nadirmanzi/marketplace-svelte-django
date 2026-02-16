@@ -5,6 +5,7 @@ This module provides DRF serializers for:
 - ReadOnlyUserSerializer: Display user profile (all fields, read-only)
 - RegisterSerializer: Create users with email, password, phone validation
 - UpdateUserSerializer: Partial updates to user profile (names, phone)
+- CustomTokenObtainPairSerializer: Login with custom tokens (session_version, email)
 - Password Validation: Enforces Django's password validators
 
 Serializer Responsibilities:
@@ -18,11 +19,9 @@ Phone Validation:
 - Validates both "possible" and "valid" states (strict validation)
 - Formats output to E.164 standard (e.g., "+15551234567")
 
-Helper Functions:
-- normalize_phone(): Parses, validates, formats phone to E.164; raises ValidationError on failure
-
 Dependencies:
 - rest_framework.serializers: Base serializer classes and validation
+- rest_framework_simplejwt.serializers: JWT token serializers
 - phonenumbers: International phone number handling
 - django.contrib.auth: Password validators and User model
 """
@@ -33,9 +32,10 @@ from django.db import IntegrityError, transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from rest_framework import serializers
-
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from users.utils.validators import validate_and_normalize_phone
+from users.tokens import CustomRefreshToken
 
 User = get_user_model()
 
@@ -59,26 +59,20 @@ def decode_uid(uid_str):
 class ReadOnlyUserSerializer(serializers.ModelSerializer):
     """Expose full user profile in read-only mode."""
 
-    full_name = serializers.CharField(read_only=True)
-
     class Meta:
         model = User
         fields = (
             "user_id",
             "email",
-            "first_name",
-            "last_name",
+            "full_name",
             "telephone_number",
-            "email_verification_status",
-            "telephone_verification_status",
             "is_active",
             "is_staff",
             "is_superuser",
             "is_soft_deleted",
-            "deleted_at",
+            "soft_deleted_at",
             "created_at",
-            "last_updated",
-            "full_name",
+            "updated_at",
         )
         read_only_fields = fields
 
@@ -91,7 +85,7 @@ class UpdateUserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("email", "first_name", "last_name", "telephone_number")
+        fields = ("email", "full_name", "telephone_number")
 
     def validate_telephone_number(self, value):
         if value in (None, ""):
@@ -101,55 +95,23 @@ class UpdateUserSerializer(serializers.ModelSerializer):
         except DjangoValidationError as e:
             raise serializers.ValidationError(e.messages[0])
 
-    def validate_first_name(self, value):
-        return value.strip()
-
-    def validate_last_name(self, value):
+    def validate_full_name(self, value):
         return value.strip()
 
     def update(self, instance, validated_data):
-        # Check if email is being changed
-        old_email = instance.email
-        new_email = validated_data.get("email", old_email)
-        email_changed = old_email.lower() != new_email.lower()
-
-        for attr, val in validated_data.items():
-            setattr(instance, attr, val)
-
-        # If email changed, reset verification status
-        if email_changed:
-            instance.email_verification_status = "pending"
-
-        instance.full_clean()
-        instance.save()
-
-        # Send new verification email if email changed
-        if email_changed:
-            try:
-                from .services.email_service import EmailVerificationService
-
-                token = EmailVerificationService.generate_token(instance)
-                request = self.context.get("request")
-                if request:
-                    base_url = request.build_absolute_uri("/")
-                else:
-                    from django.conf import settings as django_settings
-
-                    base_url = getattr(
-                        django_settings, "FRONTEND_URL", "http://localhost:5173/"
-                    )
-                verification_url = f"{base_url.rstrip('/')}/verify-email?token={token}"
-                EmailVerificationService.send_verification_email(
-                    instance, verification_url
-                )
-            except Exception:
-                import logging
-
-                logging.getLogger(__name__).warning(
-                    "Failed to send verification email to %s after email change",
-                    instance.email,
-                )
-
+        # 1. Apply the validated data to the instance
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        try:
+            with transaction.atomic():
+                instance.full_clean()
+                instance.save()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict)
+        except IntegrityError:
+            raise serializers.ValidationError({"email": "This email is already in use."})
+            
         return instance
 
 
@@ -163,15 +125,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("email", "first_name", "last_name", "telephone_number", "password")
+        fields = ("email", "full_name", "telephone_number", "password")
 
     def validate_email(self, value):
         return value.strip()
 
-    def validate_first_name(self, value):
-        return value.strip()
-
-    def validate_last_name(self, value):
+    def validate_full_name(self, value):
         return value.strip()
 
     def validate_telephone_number(self, value):
@@ -190,40 +149,132 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        password = validated_data.pop("password")
         try:
-            with transaction.atomic():
-                user = User.objects.create_user(
-                    email=validated_data.get("email"),
-                    first_name=validated_data.get("first_name"),
-                    last_name=validated_data.get("last_name"),
-                    password=password,
-                    telephone_number=validated_data.get("telephone_number"),
+            return User.objects.create_user(**validated_data)
+
+        except IntegrityError as e:
+            # Check which constraint failed
+            err_msg = str(e).lower()
+            if "telephone_number" in err_msg:
+                raise serializers.ValidationError(
+                    {"telephone_number": "A user with this phone number already exists."}
                 )
-
-                # Create Allauth EmailAddress to allow login
-                from allauth.account.models import EmailAddress
-
-                # Check if email is already verified (e.g. by superuser creation logic, though this is regular create)
-                # But here we default to False unless we want to auto-verify admin created users.
-                # Since this is an admin API, let's auto-verify to avoid friction,
-                # or better, follow the verification status of the user model.
-                verified = user.email_verification_status == "verified"
-
-                EmailAddress.objects.create(
-                    user=user, email=user.email, primary=True, verified=verified
-                )
-
-                # If not verified, we should ideally send a confirmation email.
-                # However, since this is an admin creation endpoint, maybe we skip sending email
-                # and assume the admin communicates with the user or verifies them manually?
-                # For now, ensuring the EmailAddress record exists prevents the "no email address" error.
-
-        except IntegrityError:
             raise serializers.ValidationError(
-                {"email": "A user with that email already exists."}
+                {"email": "A user with this email already exists."}
             )
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(exc.messages)
+            raise serializers.ValidationError(exc.message_dict)
 
-        return user
+
+# -------------------------
+# JWT Token Serializers
+# -------------------------
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Custom login serializer that uses CustomRefreshToken.
+    
+    This ensures tokens include:
+    - session_version: For forced logout on password change
+    - email: For convenience (no DB lookup needed in frontend)
+    
+    Usage:
+        Used by LoginView to generate tokens on login.
+    """
+    
+    @classmethod
+    def get_token(cls, user):
+        """
+        Override to use CustomRefreshToken instead of default RefreshToken.
+        
+        This method is called by TokenObtainPairSerializer.validate() when
+        generating tokens during login.
+        
+        Args:
+            user: User instance to generate tokens for
+        
+        Returns:
+            CustomRefreshToken instance with custom claims
+        """
+        return CustomRefreshToken.for_user(user)
+
+
+# -------------------------
+# Admin usage
+# -------------------------
+class StaffUserActionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for admin-only user actions (activation, deactivation, soft-delete).
+    Should only be used with proper permission checks.
+    """
+    
+    class Meta:
+        model = User
+        fields = ('is_active', 'is_soft_deleted')
+    
+    def validate(self, attrs):
+        # Prevent setting both to problematic states
+        if attrs.get('is_active') and attrs.get('is_soft_deleted'):
+            raise serializers.ValidationError(
+                "Cannot activate a soft-deleted user. Restore first."
+            )
+        return attrs
+    
+    def update(self, instance, validated_data):
+        # Let the model's save() method handle the soft-delete logic
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        try:
+            with transaction.atomic():
+                instance.full_clean()
+                instance.save()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict)
+        
+        return instance
+    
+
+class AdminUserActionSerializer(serializers.ModelSerializer):
+    """
+    Serializer for superuser-only actions (modifying permissions, staff status).
+    Should ONLY be used when request.user.is_superuser == True.
+    """
+    
+    class Meta:
+        model = User
+        fields = (
+            'is_staff', 
+            'is_superuser', 
+            'groups', 
+            'user_permissions'
+        )
+    
+    def validate(self, attrs):
+        # Prevent removing superuser status from the last superuser
+        if 'is_superuser' in attrs and attrs['is_superuser'] is False:
+            instance = self.instance
+            if instance and instance.is_superuser:
+                # Count remaining superusers (excluding this one)
+                remaining_superusers = User.objects.filter(
+                    is_superuser=True
+                ).exclude(user_id=instance.user_id).count()
+                
+                if remaining_superusers == 0:
+                    raise serializers.ValidationError(
+                        "Cannot remove superuser status from the last superuser account."
+                    )
+        
+        return attrs
+    
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
+        try:
+            with transaction.atomic():
+                instance.full_clean()
+                instance.save()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.message_dict)
+        
+        return instance

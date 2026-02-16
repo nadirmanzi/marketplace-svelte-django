@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 from rest_framework import status
 
-from users.services.email_service import EmailVerificationService
+from users1.services.email_service import EmailVerificationService
 
 
 User = get_user_model()

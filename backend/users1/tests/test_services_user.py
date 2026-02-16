@@ -1,5 +1,5 @@
 import unittest
-from users.services.user_service import UserLifecycleService
+from users1.services.user_service import UserLifecycleService
 
 
 class FakeUser:

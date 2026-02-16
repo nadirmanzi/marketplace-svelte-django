@@ -3,10 +3,8 @@
 Keep permission logic centralized so both views and services can rely on
 consistent rules and unit-test the permission functions separately.
 """
-from typing import Any
 
-
-def can_access_user(requesting_user: Any, target_user: Any) -> bool:
+def can_access_user(requesting_user, target_user):
     """Return True if `requesting_user` may access `target_user`.
 
     Rules:
@@ -24,7 +22,7 @@ def can_access_user(requesting_user: Any, target_user: Any) -> bool:
     return getattr(requesting_user, "pk", None) == getattr(target_user, "pk", None)
 
 
-def can_reactivate_user(requesting_user: Any) -> bool:
+def can_reactivate_user(requesting_user):
     """Return True if `requesting_user` may reactivate other users.
 
     Business rule: only staff may reactivate users.

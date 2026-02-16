@@ -30,9 +30,9 @@ Set in settings.py:
 
 from allauth.headless.adapter import DefaultHeadlessAdapter
 from allauth.account.adapter import DefaultAccountAdapter
-from allauth.exceptions import ImmediateHttpResponse
+from allauth.core.exceptions import ImmediateHttpResponse
 from django.http import JsonResponse
-from users.services.account_lockout_service import AccountLockoutService
+from users1.services.account_lockout_service import AccountLockoutService
 
 
 class CustomAccountAdapter(DefaultAccountAdapter):
@@ -119,6 +119,9 @@ class CustomHeadlessAdapter(DefaultHeadlessAdapter):
     - Handles both rotation-enabled and rotation-disabled scenarios
     - Account lockout is handled by CustomAccountAdapter
     """
+
+    def serialize_user(self, user):
+        return super().serialize_user(user)
 
     def respond_to_token_refresh(self, request, access_token):
         """

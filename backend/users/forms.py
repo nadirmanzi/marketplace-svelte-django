@@ -34,7 +34,6 @@ Dependencies:
 
 from users.utils.validators import validate_and_normalize_phone
 from django import forms
-from allauth.account.forms import SignupForm
 from django.contrib.auth import password_validation, get_user_model
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django.core.exceptions import ValidationError
@@ -73,27 +72,19 @@ class UserCreationForm(forms.ModelForm):
         model = User
         fields = (
             "email",
-            "first_name",
-            "last_name",
+            "full_name",
             "telephone_number",
             "is_active",
             "is_staff",
             "is_superuser",
-            "email_verification_status",
-            "telephone_verification_status",
         )
         widgets = {
             "email": forms.EmailInput(attrs={"class": "form-control"}),
-            "first_name": forms.TextInput(attrs={"class": "form-control"}),
-            "last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "full_name": forms.TextInput(attrs={"class": "form-control"}),
             "telephone_number": forms.TextInput(attrs={"class": "form-control"}),
             "is_active": forms.CheckboxInput(),
             "is_staff": forms.CheckboxInput(),
             "is_superuser": forms.CheckboxInput(),
-            "email_verification_status": forms.Select(attrs={"class": "form-control"}),
-            "telephone_verification_status": forms.Select(
-                attrs={"class": "form-control"}
-            ),
         }
 
     def clean_email(self):
@@ -118,19 +109,12 @@ class UserCreationForm(forms.ModelForm):
             raise ValidationError("A user with that phone number already exists.")
         return normalized
 
-    def clean_first_name(self):
+    def clean_full_name(self):
         """Validate first name."""
-        first_name = self.cleaned_data.get("first_name")
-        if not first_name or not first_name.strip():
-            raise ValidationError("First name is required.")
-        return first_name.strip()
-
-    def clean_last_name(self):
-        """Validate last name."""
-        last_name = self.cleaned_data.get("last_name")
-        if not last_name or not last_name.strip():
-            raise ValidationError("Last name is required.")
-        return last_name.strip()
+        full_name = self.cleaned_data.get("full_name")
+        if not full_name or not full_name.strip():
+            raise ValidationError("Full name is required.")
+        return full_name.strip()
 
     def clean_password1(self):
         """Validate password strength using Django's validators."""
@@ -152,40 +136,39 @@ class UserCreationForm(forms.ModelForm):
         return password2
 
     def clean(self):
-        """Check verification status consistency with phone presence."""
+        """Check verification status consistency."""
         cleaned_data = super().clean()
-        telephone_number = cleaned_data.get("telephone_number")
-        telephone_verification_status = cleaned_data.get(
-            "telephone_verification_status"
-        )
-
-        # If phone is provided, verification status shouldn't be 'no_number'
-        if telephone_number and telephone_verification_status == "no_number":
-            raise ValidationError(
-                "Phone number provided but verification status is 'no_number'."
-            )
-
-        # If no phone, verification status should be 'no_number'
-        if not telephone_number and telephone_verification_status != "no_number":
-            raise ValidationError(
-                "No phone number provided but verification status is not 'no_number'."
-            )
 
         return cleaned_data
 
     def save(self, commit=True):
-        """Create the user with hashed password."""
-        user = super().save(commit=False)
-        password = self.cleaned_data.get("password1")
-        user.set_password(password)
+        """
+        Delegate user creation to the Manager.
+        The Manager handles hashing, validation, and atomic transactions.
+        """
+        if not commit:
+            # Manually extract ONLY the fields that are NOT Many-to-Many
+            data = {k: v for k, v in self.cleaned_data.items() 
+                    if k not in ['groups', 'user_permissions', 'password1', 'password2']}
+            user = User(**data)
+            user.set_password(self.cleaned_data.get("password1"))
 
-        if commit:
-            try:
-                with transaction.atomic():
-                    user.full_clean()
-                    user.save()
-            except IntegrityError as e:
-                raise ValidationError(f"Error creating user: {str(e)}")
+            self.save_m2m = lambda: None
+
+            return user
+
+        # This triggers UserManager.create_user -> _create_user -> atomic transaction
+        user = User.objects.create_user(
+            email=self.cleaned_data.get("email"),
+            full_name=self.cleaned_data.get("full_name"),
+            password=self.cleaned_data.get("password1"),
+            telephone_number=self.cleaned_data.get("telephone_number"),
+            is_staff=self.cleaned_data.get("is_staff", False),
+            is_superuser=self.cleaned_data.get("is_superuser", False),
+            is_active=self.cleaned_data.get("is_active", True),
+        )
+
+        self.save_m2m = lambda: None
 
         return user
 
@@ -214,31 +197,23 @@ class UserChangeForm(forms.ModelForm):
         model = User
         fields = (
             "email",
-            "first_name",
-            "last_name",
+            "full_name",
             "telephone_number",
             "password",
             "is_active",
             "is_staff",
             "is_superuser",
-            "email_verification_status",
-            "telephone_verification_status",
             "is_soft_deleted",
         )
         widgets = {
             "email": forms.EmailInput(attrs={"class": "form-control"}),
-            "first_name": forms.TextInput(attrs={"class": "form-control"}),
-            "last_name": forms.TextInput(attrs={"class": "form-control"}),
+            "full_name": forms.TextInput(attrs={"class": "form-control"}),
             "telephone_number": forms.TextInput(attrs={"class": "form-control"}),
             "password": forms.PasswordInput(attrs={"readonly": "readonly"}),
             "is_active": forms.CheckboxInput(),
             "is_staff": forms.CheckboxInput(),
             "is_superuser": forms.CheckboxInput(),
             "is_soft_deleted": forms.CheckboxInput(),
-            "email_verification_status": forms.Select(attrs={"class": "form-control"}),
-            "telephone_verification_status": forms.Select(
-                attrs={"class": "form-control"}
-            ),
         }
 
     def clean_email(self):
@@ -269,39 +244,18 @@ class UserChangeForm(forms.ModelForm):
             raise ValidationError("A user with that phone number already exists.")
         return normalized
 
-    def clean_first_name(self):
-        """Validate first name."""
-        first_name = self.cleaned_data.get("first_name")
-        if not first_name or not first_name.strip():
-            raise ValidationError("First name is required.")
-        return first_name.strip()
-
-    def clean_last_name(self):
-        """Validate last name."""
-        last_name = self.cleaned_data.get("last_name")
-        if not last_name or not last_name.strip():
-            raise ValidationError("Last name is required.")
-        return last_name.strip()
+    def clean_full_name(self):
+        """Validate full name."""
+        full_name = self.cleaned_data.get("full_name")
+        if not full_name or not full_name.strip():
+            raise ValidationError("Full name is required.")
+        return full_name.strip()
 
     def clean(self):
         """Check verification status consistency and soft-delete logic."""
         cleaned_data = super().clean()
         telephone_number = cleaned_data.get("telephone_number")
-        telephone_verification_status = cleaned_data.get(
-            "telephone_verification_status"
-        )
         is_soft_deleted = cleaned_data.get("is_soft_deleted")
-
-        # Verify phone status consistency
-        if telephone_number and telephone_verification_status == "no_number":
-            raise ValidationError(
-                "Phone number provided but verification status is 'no_number'."
-            )
-
-        if not telephone_number and telephone_verification_status != "no_number":
-            raise ValidationError(
-                "No phone number provided but verification status is not 'no_number'."
-            )
 
         # If soft-deleted, should not be active
         if is_soft_deleted and cleaned_data.get("is_active"):
@@ -320,53 +274,7 @@ class UserChangeForm(forms.ModelForm):
                 with transaction.atomic():
                     user.full_clean()
                     user.save()
-            except IntegrityError as e:
+            except (IntegrityError, ValidationError) as e:
                 raise ValidationError(f"Error updating user: {str(e)}")
 
-        return user
-
-
-# -------------------------
-# Allauth Customization
-# -------------------------
-
-
-class CustomSignupForm(SignupForm):
-    first_name = forms.CharField(
-        max_length=75,
-        required=True,
-        widget=forms.TextInput(attrs={"placeholder": "First Name"}),
-    )
-    last_name = forms.CharField(
-        max_length=75,
-        required=True,
-        widget=forms.TextInput(attrs={"placeholder": "Last Name"}),
-    )
-    phone_number = forms.CharField(
-        max_length=32,
-        required=False,
-        widget=forms.TextInput(attrs={"placeholder": "Phone Number (optional)"}),
-        label="Phone Number",
-    )
-
-    def clean_phone_number(self):
-        """Validate and normalize phone number using utility."""
-        phone = self.cleaned_data.get("phone_number")
-        if phone:
-            return validate_and_normalize_phone(phone)
-        return None
-
-    def save(self, request):
-        """Save user and additional fields."""
-        # Adapter's save_user is called by super().save()
-        user = super().save(request)
-
-        # Now update the extra fields
-        user.first_name = self.cleaned_data["first_name"]
-        user.last_name = self.cleaned_data["last_name"]
-        phone = self.cleaned_data.get("phone_number")
-        if phone:
-            user.telephone_number = phone
-
-        user.save()
         return user

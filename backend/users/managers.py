@@ -25,6 +25,8 @@ Dependencies:
 - phonenumbers: International phone number parsing and validation
 - django.contrib.auth.BaseUserManager: Base manager class
 """
+from django.db import IntegrityError, transaction
+from django.core.exceptions import ValidationError
 
 from django.contrib.auth.base_user import BaseUserManager
 
@@ -101,8 +103,7 @@ class UserManager(BaseUserManager):
     def _create_user(
         self,
         email,
-        first_name,
-        last_name,
+        full_name,
         password=None,
         telephone_number=None,
         **extra_fields,
@@ -112,24 +113,32 @@ class UserManager(BaseUserManager):
             validate_and_normalize_phone(telephone_number) if telephone_number else None
         )
 
-        user = self.model(
-            email=email,
-            first_name=first_name.strip(),
-            last_name=last_name.strip(),
-            telephone_number=telephone_number,
-            **extra_fields,
-        )
-        if password:
-            user.set_password(password)
-        user.full_clean()
-        user.save(using=self._db)
-        return user
+        try:
+            with transaction.atomic(using=self._db):
+                user = self.model(
+                    email=email,
+                    full_name=full_name.strip(),
+                    telephone_number=telephone_number,
+                    **extra_fields,
+                )
+                if password:
+                    user.set_password(password)
+                
+                # 1. Validate fields (Logic level)
+                user.full_clean() 
+                
+                # 2. Persist (Database level)
+                user.save(using=self._db)
+                return user
+                
+        except (ValidationError, IntegrityError) as e:
+            # Re-raise so the View/Serializer can catch it and return a 400
+            raise e
 
     def create_user(
         self,
         email,
-        first_name,
-        last_name,
+        full_name,
         password=None,
         telephone_number=None,
         **extra_fields,
@@ -138,8 +147,7 @@ class UserManager(BaseUserManager):
 
         Args:
             email (str): User's email (required, will be normalized and checked for uniqueness)
-            first_name (str): User's first name (will be stripped)
-            last_name (str): User's last name (will be stripped)
+            full_name (str): User's full name (will be stripped)
             password (str, optional): Plaintext password (will be hashed via set_password)
             telephone_number (str, optional): Phone number (will be validated and normalized to E.164)
             **extra_fields: Additional fields to set on user object
@@ -151,8 +159,6 @@ class UserManager(BaseUserManager):
             is_active: True (user can login immediately)
             is_staff: False (not a staff member)
             is_superuser: False (not an admin)
-            email_verification_status: 'pending' (awaiting verification)
-            telephone_verification_status: 'pending' or 'no_number' (depending on phone provided)
 
         Raises:
             ValidationError: If email/phone invalid or violates constraints
@@ -166,7 +172,7 @@ class UserManager(BaseUserManager):
         Example:
             user = User.objects.create_user(
                 email='john@example.com',
-                first_name='John',
+                full_name='John',
                 last_name='Doe',
                 password='secure_password_123',
                 telephone_number='+15551234567'
@@ -175,23 +181,15 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_active", True)
         extra_fields.setdefault("is_staff", False)
         extra_fields.setdefault("is_superuser", False)
-        extra_fields.setdefault("email_verification_status", "pending")
-
-        # check for phone number before setting default verification status
-        if telephone_number:
-            extra_fields.setdefault("telephone_verification_status", "pending")
-        else:
-            extra_fields.setdefault("telephone_verification_status", "no_number")
 
         return self._create_user(
-            email, first_name, last_name, password, telephone_number, **extra_fields
+            email, full_name, password, telephone_number, **extra_fields
         )
 
     def create_superuser(
         self,
         email,
-        first_name,
-        last_name,
+        full_name,
         password=None,
         telephone_number=None,
         **extra_fields,
@@ -200,8 +198,7 @@ class UserManager(BaseUserManager):
 
         Args:
             email (str): Admin's email (required, unique)
-            first_name (str): Admin's first name
-            last_name (str): Admin's last name
+            full_name (str): Admin's full name
             password (str, optional): Plaintext password (will be hashed)
             telephone_number (str, optional): Phone number (optional for admin)
             **extra_fields: Additional fields to set on user object
@@ -213,8 +210,6 @@ class UserManager(BaseUserManager):
             is_staff: True (can access admin interface)
             is_superuser: True (has all permissions)
             is_active: True (can login immediately)
-            email_verification_status: 'verified' (pre-approved, no verification needed)
-            telephone_verification_status: 'verified' (pre-approved if phone provided)
 
         Raises:
             ValueError: If is_staff or is_superuser not True (enforces admin permissions)
@@ -234,7 +229,7 @@ class UserManager(BaseUserManager):
         Example:
             admin = User.objects.create_superuser(
                 email='admin@example.com',
-                first_name='Admin',
+                full_name='Admin',
                 last_name='User',
                 password='strong_password_123'
             )
@@ -242,8 +237,6 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
-        extra_fields.setdefault("email_verification_status", "verified")
-        extra_fields.setdefault("telephone_verification_status", "verified")
 
         if not extra_fields["is_staff"]:
             raise ValueError("Superuser must have is_staff=True.")
@@ -251,5 +244,5 @@ class UserManager(BaseUserManager):
             raise ValueError("Superuser must have is_superuser=True.")
 
         return self._create_user(
-            email, first_name, last_name, password, telephone_number, **extra_fields
+            email, full_name, password, telephone_number, **extra_fields
         )
