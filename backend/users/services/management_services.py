@@ -68,8 +68,6 @@ class UserManagementService:
 
         try:
             user.is_soft_deleted = True
-            user.is_active = False
-            user.soft_deleted_at = timezone.now()
             user.save(update_fields=["is_soft_deleted", "is_active", "soft_deleted_at"])
 
             audit_log.info(
@@ -154,7 +152,6 @@ class UserManagementService:
         try:
             user.is_active = True
             user.is_soft_deleted = False
-            user.soft_deleted_at = None
             user.save(update_fields=["is_active", "is_soft_deleted", "soft_deleted_at"])
 
             audit_log.info(
@@ -239,10 +236,8 @@ class UserManagementService:
             raise ServiceValidationError("is_superuser must be a boolean.")
 
         # Safety guard: Check for last superuser
-        if not is_superuser and user.is_superuser:
-            remaining = User.objects.filter(is_superuser=True).exclude(user_id=user.user_id).count()
-            if remaining == 0:
-                raise PermissionDeniedError("Cannot remove superuser status from the last superuser.")
+        if not is_superuser and user.is_last_superuser:
+            raise PermissionDeniedError("Cannot remove superuser status from the last superuser.")
 
         try:
             user.is_superuser = is_superuser

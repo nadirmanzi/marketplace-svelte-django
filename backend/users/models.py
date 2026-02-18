@@ -78,6 +78,20 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.password_changed_at + timedelta(days=self.password_expires_in_days)
         )
 
+    @property
+    def is_last_superuser(self) -> bool:
+        """
+        Check if this user is the only active superuser in the system.
+
+        Returns:
+            bool: True if this is the last remaining superuser.
+        """
+        if not self.is_superuser:
+            return False
+
+        # Count other superusers
+        return type(self).objects.filter(is_superuser=True).exclude(pk=self.pk).count() == 0
+
     class Meta:
         ordering = ["-created_at"]
         constraints = [

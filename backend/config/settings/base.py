@@ -183,12 +183,18 @@ AUTH_USER_MODEL = "users.User"
 # DRF configurations
 REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
+    "DEFAULT_RENDERER_CLASSES": (
+        "config.renderers.StandardizedJSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ),
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "users.authentication.CustomJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_PAGINATION_CLASS": "config.pagination.StandardResultsSetPagination",
+    "PAGE_SIZE": 20,
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",

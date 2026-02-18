@@ -21,6 +21,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
 
 from django.contrib.auth.models import Group, Permission
 from config.logging import audit_log
@@ -38,6 +39,7 @@ from users.utils.permissions import UserActionPermission
 from users.models import User
 from users.throttling import UserActionThrottle, RegistrationRateThrottle
 from users.services.management_services import UserManagementService
+from users.filters import UserFilter
 
 
 logger = logging.getLogger(__name__)
@@ -57,6 +59,8 @@ class UserManagementViewSet(viewsets.ModelViewSet):
     """
 
     permission_classes = [UserActionPermission()]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = UserFilter
 
     def get_queryset(self):
         """
