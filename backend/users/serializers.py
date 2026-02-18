@@ -402,29 +402,10 @@ class AdminUserActionSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        Prevent removing superuser status from the last remaining superuser.
+        Validation hook for admin actions.
 
-        This is a safety guard: if there is only one superuser and you try to
-        revoke their status, the system would be left with no admin access.
-
-        Raises:
-            ValidationError: If this would leave zero superusers.
+        (Note: Last-superuser guard moved to UserManagementService).
         """
-        if "is_superuser" in attrs and attrs["is_superuser"] is False:
-            instance = self.instance
-            if instance and instance.is_superuser:
-                # Count remaining superusers excluding this user
-                remaining_superusers = (
-                    User.objects.filter(is_superuser=True)
-                    .exclude(user_id=instance.user_id)
-                    .count()
-                )
-
-                if remaining_superusers == 0:
-                    raise serializers.ValidationError(
-                        "Cannot remove superuser status from the last superuser account."
-                    )
-
         return attrs
 
     def update(self, instance, validated_data):

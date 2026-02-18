@@ -4,8 +4,8 @@ User management service: state transitions for User accounts.
 Encapsulates business logic for user lifecycle operations so views
 don't need to know field names or validation rules.
 
-Each method returns (user, None) on success or (None, error_str) on failure,
-keeping the API HTTP-agnostic.
+Methods raise typed exceptions from users.exceptions on failure,
+which are handled by the global DRF exception handler.
 
 Methods:
 - soft_delete_user: Mark user as deleted (reversible, preserves data)
@@ -16,11 +16,17 @@ Methods:
 - manage_groups: Add/remove user from permission groups
 - manage_permissions: Add/remove individual permissions from user
 """
-from typing import Optional, Tuple
-from django.db import transaction
+from typing import Optional, List
+from django.db import transaction, DatabaseError
 from django.contrib.auth import get_user_model
-from config.logging import audit_log
 from django.utils import timezone
+from config.logging import audit_log
+from users.exceptions import (
+    ConflictError,
+    ServiceValidationError,
+    NotFoundError,
+    PermissionDeniedError,
+)
 
 User = get_user_model()
 
@@ -29,285 +35,341 @@ class UserManagementService:
     """
     Encapsulates user state transitions.
 
-    All methods are atomic transactions. Each returns (user, None) on success
-    or (None, error_message) on failure.
-
-    Example:
-        user, error = UserManagementService.deactivate_user(user)
-        if error:
-            return Response({"error": error}, status=400)
+    All methods are atomic transactions. On success, they return the updated
+    user instance. On failure, they raise a specific ServiceError subclass.
     """
 
     @classmethod
     @transaction.atomic
-    def soft_delete_user(cls, user) -> Tuple[Optional[object], Optional[str]]:
+    def soft_delete_user(cls, user) -> "User":
         """
         Mark user as soft-deleted (reversible).
 
         Sets is_soft_deleted=True and is_active=False, records soft_deleted_at timestamp.
-        Data is preserved; user cannot log in.
 
         Args:
             user: User instance to soft-delete.
 
         Returns:
-            (user, None) on success, (None, error_str) if already deleted.
+            User: Updated user instance.
 
-        Example:
-            user, err = UserManagementService.soft_delete_user(user)
+        Raises:
+            ConflictError: If user is already soft-deleted.
         """
         if getattr(user, "is_soft_deleted", False):
             audit_log.warning(
                 action="user.soft_delete",
-                message=f"Attempt to soft-delete already deleted user: {getattr(user, 'user_id', None)}",
+                message=f"Attempt to soft-delete already deleted user: {user.user_id}",
                 status="failed",
                 source="users.services.management_services",
-                target_user_id=str(getattr(user, "user_id", "")),
+                target_user_id=str(user.user_id),
             )
-            return None, "User already deleted"
+            raise ConflictError("User already deleted")
 
-        user.is_soft_deleted = True
-        if hasattr(user, "is_active"):
+        try:
+            user.is_soft_deleted = True
             user.is_active = False
-        if hasattr(user, "soft_deleted_at"):
             user.soft_deleted_at = timezone.now()
+            user.save(update_fields=["is_soft_deleted", "is_active", "soft_deleted_at"])
 
-        # Build update_fields only for fields that exist on the model
-        update_fields = []
-        if hasattr(user, "is_soft_deleted"):
-            update_fields.append("is_soft_deleted")
-        if hasattr(user, "is_active"):
-            update_fields.append("is_active")
-        if hasattr(user, "soft_deleted_at"):
-            update_fields.append("soft_deleted_at")
-
-        if update_fields:
-            user.save(update_fields=update_fields)
-        else:
-            user.save()
-
-        audit_log.info(
-            action="user.soft_delete",
-            message=f"User soft-deleted: {user.user_id}",
-            status="success",
-            source="users.services.management_services",
-            target_user_id=str(user.user_id),
-        )
-        return user, None
+            audit_log.info(
+                action="user.soft_delete",
+                message=f"User soft-deleted: {user.user_id}",
+                status="success",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            return user
+        except DatabaseError as e:
+            audit_log.error(
+                action="user.soft_delete",
+                message=f"Database error during soft-delete: {str(e)}",
+                status="failed",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            raise
 
     @classmethod
     @transaction.atomic
-    def deactivate_user(cls, user) -> Tuple[Optional[object], Optional[str]]:
+    def deactivate_user(cls, user) -> "User":
         """
-        Temporarily disable a user account (keeps data, not a deletion).
+        Temporarily disable a user account.
 
         Args:
             user: User instance to deactivate.
 
         Returns:
-            (user, None) on success, (None, error_str) if already deactivated or soft-deleted.
+            User: Updated user instance.
 
-        Example:
-            user, err = UserManagementService.deactivate_user(user)
+        Raises:
+            ConflictError: If already deactivated or soft-deleted.
         """
         if getattr(user, "is_soft_deleted", False):
-            return None, "User has been deleted and cannot be deactivated"
+            raise ConflictError("User has been deleted and cannot be deactivated")
 
         if not getattr(user, "is_active", True):
-            return None, "User already deactivated"
+            raise ConflictError("User already deactivated")
 
-        user.is_active = False
-        user.save(update_fields=["is_active"])
+        try:
+            user.is_active = False
+            user.save(update_fields=["is_active"])
 
-        audit_log.info(
-            action="user.deactivate",
-            message=f"User deactivated: {user.user_id}",
-            status="success",
-            source="users.services.management_services",
-            target_user_id=str(user.user_id),
-        )
-        return user, None
+            audit_log.info(
+                action="user.deactivate",
+                message=f"User deactivated: {user.user_id}",
+                status="success",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            return user
+        except DatabaseError as e:
+            audit_log.error(
+                action="user.deactivate",
+                message=f"Database error during deactivation: {str(e)}",
+                status="failed",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            raise
 
     @classmethod
     @transaction.atomic
-    def activate_user(cls, user) -> Tuple[Optional[object], Optional[str]]:
+    def activate_user(cls, user) -> "User":
         """
         Re-enable a deactivated or soft-deleted user account.
-
-        Clears is_soft_deleted and soft_deleted_at if set, then sets is_active=True.
 
         Args:
             user: User instance to activate.
 
         Returns:
-            (user, None) on success, (None, error_str) if already active.
+            User: Updated user instance.
 
-        Example:
-            user, err = UserManagementService.activate_user(user)
+        Raises:
+            ConflictError: If already active.
         """
         if getattr(user, "is_active", True) and not getattr(user, "is_soft_deleted", False):
-            return None, "User already active"
+            raise ConflictError("User already active")
 
-        user.is_active = True
-        if hasattr(user, "is_soft_deleted"):
+        try:
+            user.is_active = True
             user.is_soft_deleted = False
-        if hasattr(user, "soft_deleted_at"):
             user.soft_deleted_at = None
+            user.save(update_fields=["is_active", "is_soft_deleted", "soft_deleted_at"])
 
-        update_fields = ["is_active"]
-        if hasattr(user, "is_soft_deleted"):
-            update_fields.append("is_soft_deleted")
-        if hasattr(user, "soft_deleted_at"):
-            update_fields.append("soft_deleted_at")
-
-        user.save(update_fields=update_fields)
-
-        audit_log.info(
-            action="user.activate",
-            message=f"User activated: {user.user_id}",
-            status="success",
-            source="users.services.management_services",
-            target_user_id=str(user.user_id),
-        )
-        return user, None
-
-    @staticmethod
-    @transaction.atomic
-    def set_staff_status(user, is_staff: bool) -> Tuple[Optional[object], Optional[str]]:
-        """
-        Grant or revoke staff status (access to Django admin interface).
-
-        Args:
-            user: User instance.
-            is_staff (bool): True to grant staff, False to revoke.
-
-        Returns:
-            (user, None) on success.
-
-        Example:
-            user, err = UserManagementService.set_staff_status(user, True)
-        """
-        user.is_staff = is_staff
-        user.save(update_fields=["is_staff"])
-        audit_log.info(
-            action="user.set_staff_status",
-            message=f"User staff status changed: {user.user_id} -> {is_staff}",
-            status="success",
-            source="users.services.management_services",
-            target_user_id=str(user.user_id),
-            extra={"is_staff": is_staff}
-        )
-        return user, None
+            audit_log.info(
+                action="user.activate",
+                message=f"User activated: {user.user_id}",
+                status="success",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            return user
+        except DatabaseError as e:
+            audit_log.error(
+                action="user.activate",
+                message=f"Database error during activation: {str(e)}",
+                status="failed",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            raise
 
     @staticmethod
     @transaction.atomic
-    def set_superuser_status(user, is_superuser: bool) -> Tuple[Optional[object], Optional[str]]:
+    def set_staff_status(user, is_staff: bool) -> "User":
         """
-        Grant or revoke superuser status (all permissions, no explicit grants needed).
+        Grant or revoke staff status.
 
         Args:
             user: User instance.
-            is_superuser (bool): True to grant superuser, False to revoke.
+            is_staff: True to grant staff, False to revoke.
 
         Returns:
-            (user, None) on success, (None, error_str) on invalid input.
+            User: Updated user instance.
+        """
+        if not isinstance(is_staff, bool):
+            raise ServiceValidationError("is_staff must be a boolean.")
 
-        Note:
-            Does not check if this is the last superuser — that guard lives in the serializer.
+        try:
+            user.is_staff = is_staff
+            user.save(update_fields=["is_staff"])
+            audit_log.info(
+                action="user.set_staff_status",
+                message=f"User staff status changed: {user.user_id} -> {is_staff}",
+                status="success",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+                extra={"is_staff": is_staff}
+            )
+            return user
+        except DatabaseError as e:
+            audit_log.error(
+                action="user.set_staff_status",
+                message=f"Database error setting staff status: {str(e)}",
+                status="failed",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            raise
 
-        Example:
-            user, err = UserManagementService.set_superuser_status(user, False)
+    @staticmethod
+    @transaction.atomic
+    def set_superuser_status(user, is_superuser: bool) -> "User":
+        """
+        Grant or revoke superuser status.
+
+        Includes safety guard to prevent zero superusers.
+
+        Args:
+            user: User instance.
+            is_superuser: True to grant, False to revoke.
+
+        Returns:
+            User: Updated user instance.
+
+        Raises:
+            PermissionDeniedError: If revoking the last superuser.
+            ServiceValidationError: If input is not boolean.
         """
         if is_superuser is None:
-            return None, "is_superuser field is required."
+            raise ServiceValidationError("is_superuser field is required.")
 
         if not isinstance(is_superuser, bool):
-            return None, "is_superuser must be a boolean."
+            raise ServiceValidationError("is_superuser must be a boolean.")
 
-        user.is_superuser = is_superuser
-        user.save(update_fields=["is_superuser"])
-        audit_log.info(
-            action="user.set_superuser_status",
-            message=f"User superuser status changed: {user.user_id} -> {is_superuser}",
-            status="success",
-            source="users.services.management_services",
-            target_user_id=str(user.user_id),
-            extra={"is_superuser": is_superuser}
-        )
-        return user, None
+        # Safety guard: Check for last superuser
+        if not is_superuser and user.is_superuser:
+            remaining = User.objects.filter(is_superuser=True).exclude(user_id=user.user_id).count()
+            if remaining == 0:
+                raise PermissionDeniedError("Cannot remove superuser status from the last superuser.")
+
+        try:
+            user.is_superuser = is_superuser
+            user.save(update_fields=["is_superuser"])
+            audit_log.info(
+                action="user.set_superuser_status",
+                message=f"User superuser status changed: {user.user_id} -> {is_superuser}",
+                status="success",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+                extra={"is_superuser": is_superuser}
+            )
+            return user
+        except DatabaseError as e:
+            audit_log.error(
+                action="user.set_superuser_status",
+                message=f"Database error setting superuser status: {str(e)}",
+                status="failed",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            raise
 
     @staticmethod
     @transaction.atomic
-    def manage_groups(user, action: str, group_ids: list) -> Tuple[Optional[object], Optional[str]]:
+    def manage_groups(user, action: str, group_ids: List[int]) -> "User":
         """
         Add or remove a user from permission groups.
 
         Args:
             user: User instance.
-            action (str): 'add' or 'remove'.
-            group_ids (list[int]): List of Group primary keys.
+            action: 'add' or 'remove'.
+            group_ids: List of group IDs.
 
         Returns:
-            (user, None) on success, (None, error_str) if action is invalid.
+            User: Updated user instance.
 
-        Example:
-            user, err = UserManagementService.manage_groups(user, "add", [1, 2])
+        Raises:
+            ServiceValidationError: For invalid action.
+            NotFoundError: If any provided group IDs are invalid.
         """
         if action not in ["add", "remove"]:
-            return None, "Action must be 'add' or 'remove'."
+            raise ServiceValidationError("Action must be 'add' or 'remove'.")
 
         from django.contrib.auth.models import Group
         groups = Group.objects.filter(id__in=group_ids)
+        
+        if groups.count() != len(group_ids):
+            found_ids = set(groups.values_list('id', flat=True))
+            missing_ids = set(group_ids) - found_ids
+            raise NotFoundError(f"Groups not found: {list(missing_ids)}")
 
-        if action == "add":
-            user.groups.add(*groups)
-        else:
-            user.groups.remove(*groups)
+        try:
+            if action == "add":
+                user.groups.add(*groups)
+            else:
+                user.groups.remove(*groups)
 
-        audit_log.info(
-            action=f"user.groups.{action}",
-            message=f"User groups updated ({action}): {user.user_id}",
-            status="success",
-            source="users.services.management_services",
-            target_user_id=str(user.user_id),
-            extra={"group_ids": group_ids, "action": action}
-        )
-        return user, None
+            audit_log.info(
+                action=f"user.groups.{action}",
+                message=f"User groups updated ({action}): {user.user_id}",
+                status="success",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+                extra={"group_ids": group_ids, "action": action}
+            )
+            return user
+        except DatabaseError as e:
+            audit_log.error(
+                action="user.manage_groups",
+                message=f"Database error managing groups: {str(e)}",
+                status="failed",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            raise
 
     @staticmethod
     @transaction.atomic
-    def manage_permissions(user, action: str, permission_ids: list) -> Tuple[Optional[object], Optional[str]]:
+    def manage_permissions(user, action: str, permission_ids: List[int]) -> "User":
         """
         Add or remove individual permissions from a user.
 
         Args:
             user: User instance.
-            action (str): 'add' or 'remove'.
-            permission_ids (list[int]): List of Permission primary keys.
+            action: 'add' or 'remove'.
+            permission_ids: List of permission IDs.
 
         Returns:
-            (user, None) on success, (None, error_str) if action is invalid.
+            User: Updated user instance.
 
-        Example:
-            user, err = UserManagementService.manage_permissions(user, "remove", [5])
+        Raises:
+            ServiceValidationError: For invalid action.
+            NotFoundError: If any provided permission IDs are invalid.
         """
         if action not in ["add", "remove"]:
-            return None, "Action must be 'add' or 'remove'."
+            raise ServiceValidationError("Action must be 'add' or 'remove'.")
 
         from django.contrib.auth.models import Permission
-        permissions = Permission.objects.filter(id__in=permission_ids)
+        perms = Permission.objects.filter(id__in=permission_ids)
 
-        if action == "add":
-            user.user_permissions.add(*permissions)
-        else:
-            user.user_permissions.remove(*permissions)
+        if perms.count() != len(permission_ids):
+            found_ids = set(perms.values_list('id', flat=True))
+            missing_ids = set(permission_ids) - found_ids
+            raise NotFoundError(f"Permissions not found: {list(missing_ids)}")
 
-        audit_log.info(
-            action=f"user.permissions.{action}",
-            message=f"User permissions updated ({action}): {user.user_id}",
-            status="success",
-            source="users.services.management_services",
-            target_user_id=str(user.user_id),
-            extra={"permission_ids": permission_ids, "action": action}
-        )
-        return user, None
+        try:
+            if action == "add":
+                user.user_permissions.add(*perms)
+            else:
+                user.user_permissions.remove(*perms)
+
+            audit_log.info(
+                action=f"user.permissions.{action}",
+                message=f"User permissions updated ({action}): {user.user_id}",
+                status="success",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+                extra={"permission_ids": permission_ids, "action": action}
+            )
+            return user
+        except DatabaseError as e:
+            audit_log.error(
+                action="user.manage_permissions",
+                message=f"Database error managing permissions: {str(e)}",
+                status="failed",
+                source="users.services.management_services",
+                target_user_id=str(user.user_id),
+            )
+            raise

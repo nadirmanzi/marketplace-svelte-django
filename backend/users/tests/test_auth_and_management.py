@@ -10,6 +10,7 @@ from users.services.management_services import UserManagementService
 User = get_user_model()
 
 @override_settings(REST_FRAMEWORK={
+    'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'users.authentication.CustomJWTAuthentication',
     ),
@@ -91,16 +92,26 @@ class AuthAndManagementTests(TestCase):
         url = reverse("user-set-staff-status", kwargs={"pk": self.user.pk})
         
         # Set to True
-        response = self.client.post(url, {"is_staff": True})
+        response = self.client.post(url, {"is_staff": True}, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertTrue(self.user.is_staff)
         
         # Set to False
-        response = self.client.post(url, {"is_staff": False})
+        response = self.client.post(url, {"is_staff": False}, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertFalse(self.user.is_staff)
+
+    def test_invalid_boolean_status(self):
+        """Test that invalid boolean input raises ServiceValidationError (400)."""
+        self.client.force_authenticate(user=self.superuser)
+        url = reverse("user-set-staff-status", kwargs={"pk": self.user.pk})
+        
+        # Passing a string instead of a boolean (in JSON)
+        response = self.client.post(url, {"is_staff": "not-a-bool"}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("must be a boolean", response.data["detail"])
 
     def test_set_superuser_status(self):
         """Test setting superuser status via service."""

@@ -182,6 +182,7 @@ AUTH_USER_MODEL = "users.User"
 
 # DRF configurations
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "users.authentication.CustomJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",

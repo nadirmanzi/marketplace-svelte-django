@@ -58,7 +58,7 @@ class LoginView(TokenObtainPairView):
         
         try:
             serializer.is_valid(raise_exception=True)
-        except TokenError as e:
+        except Exception as e:
             # Log failed login attempt
             audit_log.warning(
                 action="auth.login_failed",
@@ -66,7 +66,7 @@ class LoginView(TokenObtainPairView):
                 status="failed",
                 source="users.views.LoginView",
             )
-            raise InvalidToken(e.args[0])
+            raise
         
         # Invalidate old sessions by incrementing version
         user = serializer.user
@@ -132,7 +132,7 @@ class CustomTokenRefreshView(TokenRefreshView):
         
         try:
             serializer.is_valid(raise_exception=True)
-        except TokenError as e:
+        except Exception as e:
             # Log failed refresh
             audit_log.warning(
                 action="auth.token_refresh_failed",
@@ -140,7 +140,7 @@ class CustomTokenRefreshView(TokenRefreshView):
                 status="failed",
                 source="users.views.CustomTokenRefreshView",
             )
-            raise InvalidToken(e.args[0])
+            raise
         
         # Log successful refresh (debug level - happens frequently)
         audit_log.debug(
@@ -186,7 +186,7 @@ class CustomTokenVerifyView(TokenVerifyView):
         
         try:
             serializer.is_valid(raise_exception=True)
-        except TokenError as e:
+        except Exception as e:
             # Log verification failure (debug level)
             audit_log.debug(
                 action="auth.token_verify_failed",
@@ -194,7 +194,7 @@ class CustomTokenVerifyView(TokenVerifyView):
                 status="failed",
                 source="users.views.CustomTokenVerifyView",
             )
-            raise InvalidToken(e.args[0])
+            raise
         
         return Response(status=status.HTTP_200_OK)
 
@@ -260,7 +260,7 @@ class LogoutView(APIView):
                 status=status.HTTP_200_OK
             )
         
-        except TokenError as e:
+        except Exception as e:
             # Log logout failure
             audit_log.warning(
                 action="auth.logout_failed",
@@ -269,11 +269,7 @@ class LogoutView(APIView):
                 source="users.views.LogoutView",
                 target_user_id=str(request.user.user_id) if request.user.is_authenticated else None,
             )
-            
-            return Response(
-                {"detail": "Invalid or expired refresh token."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            raise
     
     def _get_client_ip(self, request):
         """Extract client IP address from request."""

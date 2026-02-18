@@ -16,6 +16,7 @@ Handles:
 - POST   /users/management/{pk}/manage-groups/    -> manage groups (superuser)
 - POST   /users/management/{pk}/manage-permissions/ -> manage permissions (superuser)
 """
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -54,6 +55,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
     - Admin actions (deactivate, activate, soft-delete): staff with specific perms
     - Superuser-only actions (set-staff, set-superuser, groups, permissions): superuser
     """
+
     permission_classes = [UserActionPermission()]
 
     def get_queryset(self):
@@ -167,32 +169,14 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         POST /users/management/{pk}/deactivate/
 
         Returns:
-            200: {"message": ..., "user": {user_id, email}}
-            400: {"error": reason} if already deactivated or soft-deleted.
+            200: {"detail": "...", "user": {user_id, email}}
         """
         user = self.get_object()
+        user = UserManagementService.deactivate_user(user)
 
-        user, error = UserManagementService.deactivate_user(user)
-        if error:
-            audit_log.warning(
-                action="user.deactivate",
-                message=f"Deactivation failed: {error}",
-                status="failed",
-                source="users.views.management_views.deactivate",
-                target_user_id=str(request.user.user_id),
-            )
-            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
-
-        audit_log.info(
-            action="user.deactivate",
-            message="User deactivated successfully",
-            status="success",
-            source="users.views.management_views.deactivate",
-            target_user_id=str(request.user.user_id),
-        )
         return Response(
             {
-                "message": "User has been deactivated.",
+                "detail": "User has been deactivated.",
                 "user": ReadOnlyUserSerializer(user, fields=["user_id", "email"]).data,
             },
             status=status.HTTP_200_OK,
@@ -206,32 +190,14 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         POST /users/management/{pk}/activate/
 
         Returns:
-            200: {"message": ..., "user": {user_id, email}}
-            400: {"error": reason} if already active.
+            200: {"detail": "...", "user": {user_id, email}}
         """
         user = self.get_object()
+        user = UserManagementService.activate_user(user)
 
-        user, error = UserManagementService.activate_user(user)
-        if error:
-            audit_log.warning(
-                action="user.activate",
-                message=f"Activation failed: {error}",
-                status="failed",
-                source="users.views.management_views.activate",
-                target_user_id=str(request.user.user_id),
-            )
-            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
-
-        audit_log.info(
-            action="user.activate",
-            message="User activated successfully",
-            status="success",
-            source="users.views.management_views.activate",
-            target_user_id=str(request.user.user_id),
-        )
         return Response(
             {
-                "message": "User has been activated.",
+                "detail": "User has been activated.",
                 "user": ReadOnlyUserSerializer(user, fields=["user_id", "email"]).data,
             },
             status=status.HTTP_200_OK,
@@ -245,32 +211,14 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         POST /users/management/{pk}/soft-delete/
 
         Returns:
-            200: {"message": ..., "user": {user_id, email}}
-            400: {"error": reason} if already soft-deleted.
+            200: {"detail": "...", "user": {user_id, email}}
         """
         user = self.get_object()
+        user = UserManagementService.soft_delete_user(user)
 
-        user, error = UserManagementService.soft_delete_user(user)
-        if error:
-            audit_log.warning(
-                action="user.soft_delete",
-                message=f"Soft delete failed: {error}",
-                status="failed",
-                source="users.views.management_views.soft_delete",
-                target_user_id=str(request.user.user_id),
-            )
-            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
-
-        audit_log.info(
-            action="user.soft_delete",
-            message="User soft-deleted successfully",
-            status="success",
-            source="users.views.management_views.soft_delete",
-            target_user_id=str(request.user.user_id),
-        )
         return Response(
             {
-                "message": "User has been soft-deleted.",
+                "detail": "User has been soft-deleted.",
                 "user": ReadOnlyUserSerializer(user, fields=["user_id", "email"]).data,
             },
             status=status.HTTP_200_OK,
@@ -285,7 +233,11 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         Returns:
             200: Full user profile (ReadOnlyUserSerializer).
+            401: If user is not authenticated.
         """
+        if not request.user.is_authenticated:
+            return Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
+            
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
@@ -301,14 +253,11 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         Returns:
             200: Updated user profile.
-            400: {"detail": reason} on validation error.
         """
         user = self.get_object()
-        user, error = UserManagementService.set_staff_status(
+        user = UserManagementService.set_staff_status(
             user, request.data.get("is_staff")
         )
-        if error:
-            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(ReadOnlyUserSerializer(user).data)
 
@@ -322,7 +271,6 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         Returns:
             200: Updated user profile.
-            400: {"detail": reason} on validation error.
             403: If requesting user is not a superuser.
         """
         if not request.user.is_superuser:
@@ -332,11 +280,9 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             )
 
         user = self.get_object()
-        user, error = UserManagementService.set_superuser_status(
+        user = UserManagementService.set_superuser_status(
             user, request.data.get("is_superuser")
         )
-        if error:
-            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(ReadOnlyUserSerializer(user).data)
 
@@ -353,7 +299,6 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         Returns:
             200: {"detail": ..., "current_groups": [...]}
-            400: {"detail": reason} on invalid input.
             403: If requesting user is not a superuser.
         """
         if not request.user.is_superuser:
@@ -366,26 +311,14 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         action_type = request.data.get("action")
         group_ids = request.data.get("group_ids", [])
 
-        if action_type not in ["add", "remove"]:
-            return Response(
-                {"detail": "Action must be 'add' or 'remove'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        user = UserManagementService.manage_groups(user, action_type, group_ids)
 
-        try:
-            user, error = UserManagementService.manage_groups(user, action_type, group_ids)
-            if error:
-                return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
-
-            return Response(
-                {
-                    "detail": f"Successfully {action_type}ed groups.",
-                    "current_groups": list(user.groups.values_list("name", flat=True)),
-                }
-            )
-
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "detail": f"Successfully {action_type}ed groups.",
+                "current_groups": list(user.groups.values_list("name", flat=True)),
+            }
+        )
 
     @action(detail=True, methods=["post"], url_path="manage-permissions")
     def manage_permissions(self, request, pk=None):
@@ -400,7 +333,6 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         Returns:
             200: {"detail": ..., "current_permissions": [...]}
-            400: {"detail": reason} on invalid input.
             403: If requesting user is not a superuser.
         """
         if not request.user.is_superuser:
@@ -413,25 +345,13 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         action_type = request.data.get("action")
         permission_ids = request.data.get("permission_ids", [])
 
-        if action_type not in ["add", "remove"]:
-            return Response(
-                {"detail": "Action must be 'add' or 'remove'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        user = UserManagementService.manage_permissions(user, action_type, permission_ids)
 
-        try:
-            user, error = UserManagementService.manage_permissions(user, action_type, permission_ids)
-            if error:
-                return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
-
-            return Response(
-                {
-                    "detail": f"Successfully {action_type}ed permissions.",
-                    "current_permissions": list(
-                        user.user_permissions.values_list("codename", flat=True)
-                    ),
-                }
-            )
-
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "detail": f"Successfully {action_type}ed permissions.",
+                "current_permissions": list(
+                    user.user_permissions.values_list("codename", flat=True)
+                ),
+            }
+        )
