@@ -68,15 +68,32 @@ class LoginView(TokenObtainPairView):
             )
             raise InvalidToken(e.args[0])
         
+        # Invalidate old sessions by incrementing version
+        user = serializer.user
+        user.session_version += 1
+        user.save(update_fields=["session_version"])
+        
+        # Re-generate tokens with new version
+        # The serializer already generated tokens, but they have the OLD version.
+        # We need to regenerate them using our CustomRefreshToken to include the new session_version
+        from users.tokens import CustomRefreshToken
+        refresh = CustomRefreshToken.for_user(user)
+        
+        data = {
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }
+        
         # Log successful login
         audit_log.info(
             action="auth.login_success",
             message="User logged in successfully",
             status="success",
             source="users.views.LoginView",
+            target_user_id=str(user.user_id),
         )
         
-        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+        return Response(data, status=status.HTTP_200_OK)
     
     def _get_client_ip(self, request):
         """Extract client IP address from request."""
@@ -122,7 +139,6 @@ class CustomTokenRefreshView(TokenRefreshView):
                 message=f"Token refresh failed: {str(e)}",
                 status="failed",
                 source="users.views.CustomTokenRefreshView",
-                ip_address=self._get_client_ip(request),
             )
             raise InvalidToken(e.args[0])
         
@@ -225,6 +241,10 @@ class LogoutView(APIView):
             from rest_framework_simplejwt.tokens import RefreshToken
             token = RefreshToken(refresh_token)
             token.blacklist()
+
+            # Increment session version to invalidate all current access tokens
+            request.user.session_version += 1
+            request.user.save(update_fields=["session_version"])
             
             # Log successful logout
             audit_log.info(
@@ -232,9 +252,7 @@ class LogoutView(APIView):
                 message="User logged out successfully",
                 status="success",
                 source="users.views.LogoutView",
-                user_id=str(request.user.user_id),
-                email=request.user.email,
-                ip_address=self._get_client_ip(request),
+                target_user_id=str(request.user.user_id),
             )
             
             return Response(
@@ -249,7 +267,7 @@ class LogoutView(APIView):
                 message=f"Logout failed: {str(e)}",
                 status="failed",
                 source="users.views.LogoutView",
-                user_id=str(request.user.user_id) if request.user.is_authenticated else None,
+                target_user_id=str(request.user.user_id) if request.user.is_authenticated else None,
             )
             
             return Response(

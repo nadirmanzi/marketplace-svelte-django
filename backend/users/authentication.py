@@ -50,8 +50,10 @@ class CustomJWTAuthentication(JWTAuthentication):
                 message=f"Token validation failed: {e}",
                 status="failed",
                 source="users.authentication.CustomJWTAuthentication",
-                ip_address=self._get_client_ip(),
-                path=getattr(self.request, 'path', None),
+                extra={
+                    "ip_address": self._get_client_ip(),
+                    "path": getattr(self.request, 'path', None),
+                },
             )
             raise
         
@@ -62,6 +64,7 @@ class CustomJWTAuthentication(JWTAuthentication):
                 message="Soft-deleted user attempted authentication",
                 status="blocked",
                 source="users.authentication.CustomJWTAuthentication",
+                extra={"ip_address": self._get_client_ip()},
             )
             raise AuthenticationFailed(
                 _("User account has been deleted."),
@@ -75,20 +78,25 @@ class CustomJWTAuthentication(JWTAuthentication):
         if token_version != user_version:
             audit_log.warning(
                 action="auth.session_version_mismatch",
-                message="Session invalidated - version mismatch (likely password change)",
+                message="Session invalidated - version mismatch",
                 status="blocked",
                 source="users.authentication.CustomJWTAuthentication",
                 extra={
                     "token_version": token_version,
                     "user_version": user_version,
-                }
+                    "ip_address": self._get_client_ip(),
+                },
             )
             raise AuthenticationFailed(
-                _("Your session has expired due to a security event. Please log in again."),
+                _("Your session has expired. Please log in again."),
                 code="session_expired",
             )
         
-        # All checks passed
+        # All checks passed, update audit context with authenticated user
+        from config.logging.audit import update_request_context
+        # We only update the user_id, preserving existing IP and resource from middleware
+        update_request_context(user_id=user.user_id)
+        
         return user
     
     def _get_client_ip(self):

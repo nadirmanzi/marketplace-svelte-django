@@ -53,8 +53,8 @@ class MonthlyRotatingFileHandler(logging.handlers.RotatingFileHandler):
         )
     
     def _get_month_str(self) -> str:
-        """Get current month string (e.g., 'Dec-2024')."""
-        return datetime.now().strftime("%b-%Y")
+        """Get current month string (e.g., '12-2024')."""
+        return datetime.now().strftime("%m-%Y")
     
     def _get_filename(self) -> str:
         """Generate filename for current month."""

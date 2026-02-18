@@ -20,14 +20,14 @@ class UserActionPermission(permissions.BasePermission):
     
     # Fields that require special permissions (even for staff)
     SENSITIVE_FIELDS = {
-        'is_active', 'is_soft_deleted', 'is_superuser', 
+        'is_active', 'is_superuser', 
         'is_staff', 'user_permissions', 'groups',
         'password_changed_at', 'session_version'
     }
     
     # Fields that ONLY superusers can modify
     SUPERUSER_ONLY_FIELDS = {
-        'is_staff', 'is_superuser', 'user_permissions', 'groups'
+        'is_staff', 'is_soft_deleted', 'is_superuser', 'user_permissions', 'groups'
     }
     
     def has_permission(self, request, view):

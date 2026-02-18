@@ -46,7 +46,7 @@ class AccountViewSet(viewsets.GenericViewSet):
                 action="user.soft_delete",
                 message=f"Soft delete failed: {error}",
                 status="failed",
-                source="users.views.account.AccountViewSet.soft_delete",
+                source="users.views.management_views.soft_delete",
                 extra={"target_user_id": str(user_id)},
             )
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
@@ -55,7 +55,7 @@ class AccountViewSet(viewsets.GenericViewSet):
             action="user.soft_delete",
             message="User soft-deleted successfully",
             status="success",
-            source="users.views.account.AccountViewSet.soft_delete",
+            source="users.views.management_views.soft_delete",
             extra={"target_user_id": str(user.user_id)},
         )
         return Response(
@@ -78,7 +78,7 @@ class AccountViewSet(viewsets.GenericViewSet):
                 action="user.deactivate",
                 message=f"Deactivation failed: {error}",
                 status="failed",
-                source="users.views.account.AccountViewSet.deactivate",
+                source="users.views.management_views.deactivate",
                 extra={"target_user_id": str(user_id)},
             )
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
@@ -87,7 +87,7 @@ class AccountViewSet(viewsets.GenericViewSet):
             action="user.deactivate",
             message="User deactivated successfully",
             status="success",
-            source="users.views.account.AccountViewSet.deactivate",
+            source="users.views.management_views.deactivate",
             extra={"target_user_id": str(user.user_id)},
         )
         return Response(
@@ -106,7 +106,7 @@ class AccountViewSet(viewsets.GenericViewSet):
                 action="user.reactivate",
                 message="Reactivation denied - not staff",
                 status="denied",
-                source="users.views.account.AccountViewSet.reactivate",
+                source="users.views.management_views.reactivate",
                 extra={"target_user_id": str(user_id)},
             )
             return Response(
@@ -122,7 +122,7 @@ class AccountViewSet(viewsets.GenericViewSet):
                 action="user.reactivate",
                 message=f"Reactivation failed: {error}",
                 status="failed",
-                source="users.views.account.AccountViewSet.reactivate",
+                source="users.views.management_views.reactivate",
                 extra={"target_user_id": str(user_id)},
             )
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
@@ -131,7 +131,7 @@ class AccountViewSet(viewsets.GenericViewSet):
             action="user.reactivate",
             message="User reactivated successfully",
             status="success",
-            source="users.views.account.AccountViewSet.reactivate",
+            source="users.views.management_views.reactivate",
             extra={"target_user_id": str(user.user_id)},
         )
         return Response(
@@ -154,7 +154,7 @@ class AccountViewSet(viewsets.GenericViewSet):
                 action="account.unlock",
                 message="Unlock denied - not staff",
                 status="denied",
-                source="users.views.account.AccountViewSet.unlock",
+                source="users.views.management_views.unlock",
                 extra={"target_user_id": str(user_id)},
             )
             return Response(
@@ -178,7 +178,7 @@ class AccountViewSet(viewsets.GenericViewSet):
                 action="account.unlock",
                 message="Account unlocked successfully by admin",
                 status="success",
-                source="users.views.account.AccountViewSet.unlock",
+                source="users.views.management_views.unlock",
                 extra={
                     "target_user_id": str(user.user_id),
                     "unlocked_by": str(request.user.user_id),

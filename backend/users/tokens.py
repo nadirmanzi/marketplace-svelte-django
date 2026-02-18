@@ -37,45 +37,96 @@ User = get_user_model()
 
 
 class CustomAccessToken(AccessToken):
+    """Short-lived JWT access token with minimal claims (user_id, email, session_version)."""
+
     @classmethod
     def for_user(cls, user):
+        """
+        Build an access token for the given user without a DB lookup.
+
+        Args:
+            user: User instance (must have email and session_version attributes).
+
+        Returns:
+            CustomAccessToken with user_id, email, and session_version claims.
+
+        Example:
+            token = CustomAccessToken.for_user(user)
+            str(token)  # -> "eyJ..."
+        """
         token = cls()
-        
+
         # Core identity
         user_id = getattr(user, jwt_settings.USER_ID_FIELD)
         token[jwt_settings.USER_ID_FIELD] = str(user_id)
         token["email"] = user.email
-        
-        # Security
+
+        # Security: used by CustomJWTAuthentication to detect forced logouts
         token["session_version"] = getattr(user, "session_version", 0)
-        
+
         return token
 
 
 class CustomRefreshToken(SimpleJWTRefreshToken):
+    """Long-lived JWT refresh token that caches email/session_version to avoid DB lookups on refresh."""
+
     @classmethod
     def for_user(cls, user):
+        """
+        Build a refresh token for the given user with cached email and session_version.
+
+        Caching email on the refresh payload allows access tokens to be created
+        during rotation without hitting the database.
+
+        Args:
+            user: User instance.
+
+        Returns:
+            CustomRefreshToken with user_id, email, and session_version claims.
+
+        Example:
+            refresh = CustomRefreshToken.for_user(user)
+            access = refresh.access_token  # No DB query
+        """
         token = super().for_user(user)
-        
-        # Cache for access token creation
+
+        # Cache for access token creation (avoids DB lookup on token rotation)
         token["email"] = user.email
         token["session_version"] = getattr(user, "session_version", 0)
-        
+
         return token
-    
+
     @property
     def access_token(self):
+        """
+        Generate a new access token from this refresh token's payload (no DB query).
+
+        Reads user_id, email, and session_version directly from the refresh payload,
+        so no database lookup is required. This is the key performance optimization
+        for rotating refresh tokens.
+
+        Returns:
+            CustomAccessToken populated from refresh payload.
+
+        Raises:
+            ValueError: If refresh token payload is missing user_id.
+
+        Example:
+            refresh = CustomRefreshToken.for_user(user)
+            access = refresh.access_token  # CustomAccessToken instance
+            str(access)  # -> "eyJ..."
+        """
         user_id = self.payload.get(jwt_settings.USER_ID_FIELD)
         email = self.payload.get("email")
         session_version = self.payload.get("session_version", 0)
-        
+
         if not user_id:
             raise ValueError("Refresh token does not contain user_id")
-        
+
         access = CustomAccessToken()
         access[jwt_settings.USER_ID_FIELD] = user_id
         if email:
             access["email"] = email
         access["session_version"] = session_version
-        
+
         return access

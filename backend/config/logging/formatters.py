@@ -37,6 +37,8 @@ class AuditJsonFormatter(logging.Formatter):
             "ip_addr": getattr(record, "ip_addr", None),
             "user_id": getattr(record, "user_id", None),
             "action": getattr(record, "action", None),
+            "resource_id": getattr(record, "resource_id", None),
+            "target_user_id": getattr(record, "target_user_id", None),
             "message": record.getMessage(),
             "status": getattr(record, "status", None),
             "source": getattr(record, "source", record.name),

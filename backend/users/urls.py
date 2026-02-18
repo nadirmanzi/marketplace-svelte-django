@@ -2,14 +2,14 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from users.views.user_auth_views import (
+from users.views.auth_views import (
     LoginView,
     LogoutView,
     CustomTokenRefreshView,
     CustomTokenVerifyView,
 )
 
-from users.views.user_management_views import UserManagementViewSet
+from users.views.management_views import UserManagementViewSet
 
 router = DefaultRouter()
 router.register(r"", UserManagementViewSet, basename="user")
