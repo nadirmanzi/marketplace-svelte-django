@@ -6,11 +6,11 @@ Provides:
 - LoginRateThrottle: Anonymous rate limit for login attempts (scope: 'login').
 - RegistrationRateThrottle: Anonymous rate limit for registration (scope: 'register').
 - UserActionThrottle: Per-user rate limit for general actions (scope: 'user').
+- PasswordResetRateThrottle: Anonymous rate limit for password reset requests (scope: 'password_reset').
+- SensitiveActionRateThrottle: Per-user rate limit for sensitive actions (scope: 'sensitive').
+- SearchRateThrottle: Per-user rate limit for searching/listing (scope: 'search').
 
-Rates are configured in settings.REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']:
-    'login': '5/min'
-    'register': '3/hour'
-    'user': '100/day'
+Rates are configured in settings.REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'].
 """
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle
 
@@ -21,22 +21,11 @@ class UserThrottle:
 
     Superusers are exempt from all rate limits to avoid blocking admin operations.
     Must be placed before the throttle base class in MRO so allow_request is called first.
-
-    Example:
-        class MyThrottle(UserThrottle, AnonRateThrottle):
-            scope = 'my_scope'
     """
 
     def allow_request(self, request, view):
         """
         Allow request unconditionally for authenticated superusers.
-
-        Args:
-            request: DRF request object.
-            view: The view being accessed.
-
-        Returns:
-            True if user is a superuser, otherwise delegates to parent throttle logic.
         """
         if request.user and request.user.is_authenticated and request.user.is_superuser:
             return True
@@ -46,9 +35,7 @@ class UserThrottle:
 class LoginRateThrottle(UserThrottle, AnonRateThrottle):
     """
     Rate limit for login attempts (anonymous).
-
-    Scope: 'login' — configure rate in DEFAULT_THROTTLE_RATES.
-    Superusers are exempt via UserThrottle mixin.
+    Scope: 'login'
     """
     scope = 'login'
 
@@ -56,9 +43,7 @@ class LoginRateThrottle(UserThrottle, AnonRateThrottle):
 class RegistrationRateThrottle(UserThrottle, AnonRateThrottle):
     """
     Rate limit for user registration (anonymous).
-
-    Scope: 'register' — configure rate in DEFAULT_THROTTLE_RATES.
-    Superusers are exempt via UserThrottle mixin.
+    Scope: 'register'
     """
     scope = 'register'
 
@@ -66,8 +51,30 @@ class RegistrationRateThrottle(UserThrottle, AnonRateThrottle):
 class UserActionThrottle(UserThrottle, UserRateThrottle):
     """
     Per-user rate limit for general authenticated actions.
-
-    Scope: 'user' — configure rate in DEFAULT_THROTTLE_RATES.
-    Superusers are exempt via UserThrottle mixin.
+    Scope: 'user'
     """
     scope = 'user'
+
+
+class PasswordResetRateThrottle(UserThrottle, AnonRateThrottle):
+    """
+    Rate limit for password reset requests (anonymous).
+    Scope: 'password_reset' — prevents email spamming.
+    """
+    scope = 'password_reset'
+
+
+class SensitiveActionRateThrottle(UserThrottle, UserRateThrottle):
+    """
+    Rate limit for sensitive user actions (authenticated).
+    Scope: 'sensitive' — for password changes, email updates, etc.
+    """
+    scope = 'sensitive'
+
+
+class SearchRateThrottle(UserThrottle, UserRateThrottle):
+    """
+    Rate limit for searching/listing users (authenticated).
+    Scope: 'search' — prevents aggressive scraping of user data.
+    """
+    scope = 'search'

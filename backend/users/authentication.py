@@ -100,20 +100,6 @@ class CustomJWTAuthentication(JWTAuthentication):
         return user
     
     def _get_client_ip(self):
-        """
-        Extract client IP address from request.
-        
-        Returns:
-            str: Client IP address or None if unavailable
-        """
-        if not hasattr(self, 'request'):
-            return None
-        
-        # Check for proxy headers first
-        x_forwarded_for = self.request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            # Take first IP in chain (client IP)
-            return x_forwarded_for.split(',')[0].strip()
-        
-        # Fallback to direct connection IP
-        return self.request.META.get('REMOTE_ADDR')
+        """Wrapper for centralized IP utility."""
+        from users.utils.http import get_client_ip
+        return get_client_ip(getattr(self, 'request', None))

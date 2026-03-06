@@ -1,0 +1,8 @@
+{
+	"/(main)": [],
+	"/": [],
+	"/auth": [],
+	"/auth/login": [],
+	"/(main)/browse": [],
+	"/(main)/categories": []
+}

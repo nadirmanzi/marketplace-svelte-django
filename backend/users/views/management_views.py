@@ -129,10 +129,17 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
     def get_throttles(self):
         """
-        Apply RegistrationRateThrottle for create, UserActionThrottle for everything else.
+        Apply context-specific throttles:
+        - create: RegistrationRateThrottle ('register' scope)
+        - list: SearchRateThrottle ('search' scope)
+        - others: UserActionThrottle ('user' scope)
         """
         if self.action == "create":
             return [RegistrationRateThrottle()]
+        if self.action == "list":
+            # Prevent aggressive scraping of user list
+            from users.throttling import SearchRateThrottle
+            return [SearchRateThrottle()]
         return [UserActionThrottle()]
 
     def create(self, request, *args, **kwargs):
@@ -244,6 +251,48 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="change-password")
+    def change_password(self, request):
+        """
+        Change the authenticated user's password.
+        
+        POST /users/management/change-password/
+        Body: {
+            "old_password": "...",
+            "new_password": "...",
+            "confirm_password": "..."
+        }
+        """
+        from users.serializers import ChangePasswordSerializer
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        # Increment session version to invalidate OTHER sessions
+        user.session_version += 1
+        user.save()
+        
+        # Log successful password change
+        from config.logging import audit_log
+        audit_log.info(
+            action="auth.password_changed",
+            message="User changed their password successfully",
+            status="success",
+            source="users.views.UserManagementViewSet.change_password",
+            target_user_id=str(user.user_id),
+        )
+        
+        # Return new tokens so the user stays logged in
+        from users.tokens import CustomRefreshToken
+        refresh = CustomRefreshToken.for_user(user)
+        
+        return Response({
+            "detail": "Password has been changed successfully.",
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+        }, status=status.HTTP_200_OK)
 
     # --- SUPERUSER-ONLY ACTIONS ---
 

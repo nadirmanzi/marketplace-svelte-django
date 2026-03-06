@@ -75,6 +75,9 @@ class UserActionPermission(permissions.BasePermission):
         if view.action == 'soft_delete':
             return user.has_perm('users.can_soft_delete_user')
         
+        if view.action == 'change_password':
+            return True
+            
         # Default deny for unknown actions
         return False
     

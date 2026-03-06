@@ -23,7 +23,7 @@ class PasswordExpirationMiddleware:
             "user-login",
             "user-logout",
             "user-token_refresh",
-            "user-change_password",
+            "user-change-password",
             "user-register",
             "user-password_reset",
             "user-password_reset_confirm",
@@ -49,7 +49,13 @@ class PasswordExpirationMiddleware:
     
     def process_view(self, request, view_func, view_args, view_kwargs):
         """Check password expiration before view execution."""
-        # Skip if not authenticated
+        # For DRF/JWT: request.user might not be authenticated yet because 
+        # DRF authentication happens inside the view.
+        # We try to manually authenticate if an Authorization header is present.
+        if not hasattr(request, "user") or not request.user.is_authenticated:
+            self._authenticate_request(request)
+
+        # Skip if still not authenticated
         if not hasattr(request, "user") or not request.user.is_authenticated:
             return None
         
@@ -68,13 +74,39 @@ class PasswordExpirationMiddleware:
                 {
                     "error": "password_expired",
                     "detail": "Your password has expired. Please change your password.",
-                    "change_password_url": "/api/users/change-password/",  # Helpful!
+                    "change_password_url": "/users/management/change-password/",
                 },
                 status=403,
             )
         
         return None
     
+    def _authenticate_request(self, request):
+        """
+        Manually attempt to authenticate the request using DRF authentication classes.
+        This is needed because this middleware runs before DRF authentication.
+        """
+        from rest_framework.settings import api_settings
+        
+        for authenticator_class in api_settings.DEFAULT_AUTHENTICATION_CLASSES:
+            try:
+                # Import class string to class object
+                if isinstance(authenticator_class, str):
+                    from django.utils.module_loading import import_string
+                    authenticator_class = import_string(authenticator_class)
+                
+                authenticator = authenticator_class()
+                auth_result = authenticator.authenticate(request)
+                
+                if auth_result is not None:
+                    user, auth = auth_result
+                    request.user = user
+                    request.auth = auth
+                    return
+            except Exception:
+                # Authentication failed, try next authenticator
+                continue
+
     def _is_exempt_url(self, request) -> bool:
         """Check if URL is exempt from expiration check."""
         # Check prefixes first (faster)
@@ -82,7 +114,6 @@ class PasswordExpirationMiddleware:
             if request.path.startswith(prefix):
                 return True
         
-        # Check URL names
         try:
             resolved = resolve(request.path)
             return resolved.url_name in self.exempt_url_names
@@ -101,7 +132,7 @@ class PasswordExpirationMiddleware:
         )
         days_until_expiry = (expires_at - timezone.now()).days
         
-        if days_until_expiry > 0:
+        if days_until_expiry >= 0:
             response['X-Password-Expires-In-Days'] = str(days_until_expiry)
             
             # Add warning if within threshold
@@ -121,10 +152,12 @@ class PasswordExpirationMiddleware:
             message="Access blocked - password expired",
             status="blocked",
             source="users.middleware.PasswordExpirationMiddleware",
-            user_id=str(user.user_id),
-            email=user.email,
-            path=request.path,
-            method=request.method,
-            days_since_change=days_since_change,
-            password_expires_in_days=user.password_expires_in_days,
+            target_user_id=str(user.user_id),
+            extra={
+                "email": user.email,
+                "path": request.path,
+                "method": request.method,
+                "days_since_change": days_since_change,
+                "password_expires_in_days": user.password_expires_in_days,
+            }
         )

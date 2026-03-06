@@ -200,15 +200,18 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "1000/hour",
-        "user": "100/min",
+        "anon": "500/hour",
+        "user": "5000/day",
         "login": "5/min",
-        "register": "5/min",
+        "register": "2/hour",
+        "password_reset": "3/hour",
+        "sensitive": "10/hour",
+        "search": "30/min",
     },
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=10),
     "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=1),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -235,6 +238,9 @@ PASSWORD_EXPIRATION_MIDDLEWARE = {
         "user-register",
         "user-logout",
         "user-token_refresh",
+        "user-change-password",
+        "user-password_reset",
+        "user-password_reset_confirm",
     ],
     "EXEMPT_URL_PREFIXES": ["/admin/", "/schema/", "/static/", "/media/"],
     "EXEMPT_SUPERUSERS": True,  # Whether to exempt superusers

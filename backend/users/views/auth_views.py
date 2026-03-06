@@ -21,11 +21,11 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
-from rest_framework.throttling import ScopedRateThrottle
+# Removed ScopedRateThrottle as we now use our custom specialized throttles
 
 from config.logging import audit_log
 from users.serializers import CustomTokenObtainPairSerializer
-from users.throttling import LoginRateThrottle
+from users.throttling import LoginRateThrottle, UserActionThrottle
 
 
 class LoginView(TokenObtainPairView):
@@ -74,8 +74,6 @@ class LoginView(TokenObtainPairView):
         user.save(update_fields=["session_version"])
         
         # Re-generate tokens with new version
-        # The serializer already generated tokens, but they have the OLD version.
-        # We need to regenerate them using our CustomRefreshToken to include the new session_version
         from users.tokens import CustomRefreshToken
         refresh = CustomRefreshToken.for_user(user)
         
@@ -84,6 +82,20 @@ class LoginView(TokenObtainPairView):
             "access": str(refresh.access_token),
         }
         
+        # Check if password has expired
+        if hasattr(user, "password_expired") and user.password_expired:
+            audit_log.warning(
+                action="auth.login_password_expired",
+                message="User logged in with expired password",
+                status="blocked",
+                source="users.views.LoginView",
+                target_user_id=str(user.user_id),
+            )
+            # Return 403 but include tokens so they can hit change-password
+            data["error"] = "password_expired"
+            data["detail"] = "Your password has expired. Please change it to continue."
+            return Response(data, status=status.HTTP_403_FORBIDDEN)
+
         # Log successful login
         audit_log.info(
             action="auth.login_success",
@@ -94,13 +106,6 @@ class LoginView(TokenObtainPairView):
         )
         
         return Response(data, status=status.HTTP_200_OK)
-    
-    def _get_client_ip(self, request):
-        """Extract client IP address from request."""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            return x_forwarded_for.split(',')[0].strip()
-        return request.META.get('REMOTE_ADDR')
 
 
 class CustomTokenRefreshView(TokenRefreshView):
@@ -123,8 +128,8 @@ class CustomTokenRefreshView(TokenRefreshView):
     - This prevents token reuse attacks
     """
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'user'
+    throttle_classes = [UserActionThrottle]
+    # throttle_scope = 'user'  # No longer needed with UserActionThrottle
     
     def post(self, request, *args, **kwargs):
         """Handle token refresh with audit logging."""
@@ -151,13 +156,6 @@ class CustomTokenRefreshView(TokenRefreshView):
         )
         
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
-    
-    def _get_client_ip(self, request):
-        """Extract client IP address from request."""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            return x_forwarded_for.split(',')[0].strip()
-        return request.META.get('REMOTE_ADDR')
 
 
 class CustomTokenVerifyView(TokenVerifyView):
@@ -177,8 +175,8 @@ class CustomTokenVerifyView(TokenVerifyView):
     or to implement "remember me" functionality.
     """
     permission_classes = [AllowAny]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'user'
+    throttle_classes = [UserActionThrottle]
+    # throttle_scope = 'user'  # No longer needed with UserActionThrottle
     
     def post(self, request, *args, **kwargs):
         """Handle token verification with audit logging."""
@@ -223,8 +221,8 @@ class LogoutView(APIView):
     3. Redirect to login page
     """
     permission_classes = [IsAuthenticated]
-    throttle_classes = [ScopedRateThrottle]
-    throttle_scope = 'user'
+    throttle_classes = [UserActionThrottle]
+    # throttle_scope = 'user'  # No longer needed with UserActionThrottle
     
     def post(self, request):
         """Blacklist refresh token to logout user."""
@@ -270,10 +268,3 @@ class LogoutView(APIView):
                 target_user_id=str(request.user.user_id) if request.user.is_authenticated else None,
             )
             raise
-    
-    def _get_client_ip(self, request):
-        """Extract client IP address from request."""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            return x_forwarded_for.split(',')[0].strip()
-        return request.META.get('REMOTE_ADDR')
