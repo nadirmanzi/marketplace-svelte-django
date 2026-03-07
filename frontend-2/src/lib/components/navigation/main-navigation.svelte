@@ -6,12 +6,16 @@
 	import ShoppingBag from '@tabler/icons-svelte-runes/icons/shopping-bag';
 	import { fade, fly } from 'svelte/transition';
 
-	let activeLink = $state<{
+	import type { Snippet } from 'svelte';
+
+	interface NavLink {
 		label: string;
-		href: string;
 		content: string;
-		render?: import('svelte').Snippet;
-	} | null>(null);
+		href?: string;
+		render?: Snippet;
+	}
+
+	let activeLink = $state<NavLink | null>(null);
 
 	let isOpen = $state(false);
 	let isClosing = $state(false);
@@ -35,11 +39,9 @@
 		return () => observer.disconnect();
 	});
 
-	function handleHover(link: any) {
-		// Cancel any in-progress close
+	function handleHover(link: NavLink) {
 		isClosing = false;
 
-		// If the link does not have a render snippet (e.g., 'Support'), it acts like a mouse leave
 		if (!link.render) {
 			handleMouseLeave();
 			return;
@@ -50,6 +52,7 @@
 		} else if (!isOpen) {
 			isCrossHover = false;
 		}
+
 		activeLink = link;
 		isOpen = true;
 	}
@@ -76,13 +79,13 @@
 <div class="fixed top-0 z-50 w-screen bg-white" onmouseleave={handleMouseLeave} role="navigation">
 	<nav class="flex h-16 w-full items-center justify-center gap-16 p-1 px-8">
 		<section onmouseenter={handleMouseLeave} role="presentation">
-			<a href="/">
+			<a href="/ui">
 				<img src={WhiteLogo} alt="Logo" class="hidden size-8 dark:block" />
 				<img src={BlackLogo} alt="Logo" class="size-8 dark:hidden" />
 			</a>
 		</section>
 		<section>
-			<MainNavLinks onHover={handleHover} {isCrossHover} activeLabel={activeLink?.label} />
+			<MainNavLinks onHover={handleHover} />
 		</section>
 		<section
 			class="flex items-center justify-center gap-6"

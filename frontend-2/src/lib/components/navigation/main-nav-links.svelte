@@ -1,7 +1,6 @@
 <script lang="ts">
 	import Button from '../ui/button.svelte';
-	import type { Snippet } from 'svelte';
-	import { slideFade } from './transitions.svelte';
+	import type { Component, Snippet } from 'svelte';
 
 	import Package from '@tabler/icons-svelte-runes/icons/package';
 	import Receipt from '@tabler/icons-svelte-runes/icons/receipt';
@@ -12,15 +11,43 @@
 	import CreditCard from '@tabler/icons-svelte-runes/icons/credit-card';
 	import BellRinging from '@tabler/icons-svelte-runes/icons/bell-ringing';
 
+	interface NavLink {
+		label: string;
+		href?: string;
+		render?: Snippet;
+		content?: string;
+	}
+
 	let {
-		onHover,
-		isCrossHover,
-		activeLabel
+		onHover
 	}: {
-		onHover: (link: any) => void;
-		isCrossHover: boolean;
-		activeLabel?: string;
+		onHover: (link: NavLink) => void;
 	} = $props();
+
+	const links: NavLink[] = [
+		{ label: 'Shop', render: ShopContent, content: 'And discover the full marketplace.' },
+		{
+			label: 'Categories',
+			href: '/categories',
+			render: CategoriesContent,
+			content: 'Browse an extensive range of products.'
+		},
+		{
+			label: 'Orders',
+			render: OrdersContent,
+			content: 'Track your shopping journey and manage your purchases.'
+		},
+		{
+			label: 'Account',
+			render: AccountContent,
+			content: 'Personalize your experience and your security.'
+		},
+		{
+			label: 'Support',
+			href: '/support',
+			content: 'Personalize your experience and manage your security settings.'
+		}
+	];
 </script>
 
 <!-- ─── NAV CONTENT SNIPPETS (The "Empty Canvas") ─── -->
@@ -32,7 +59,7 @@
 			<h3 class="text-xs font-semibold tracking-widest text-foreground/50 uppercase">{title}</h3>
 		</div>
 		<ul class="space-y-3">
-			{#each items as item}
+			{#each items as item (item)}
 				<li
 					class="group block cursor-pointer text-sm text-foreground transition-colors hover:text-secondary"
 				>
@@ -78,9 +105,9 @@
 	</div>
 {/snippet}
 
-{#snippet ActionCard(items: { title: string; desc: string; icon: any }[])}
+{#snippet ActionCard(items: { title: string; desc: string; icon: Component }[])}
 	<div class="grid grid-cols-2 gap-x-8 gap-y-4">
-		{#each items as item}
+		{#each items as item (item)}
 			{@const Icon = item.icon}
 			<a
 				href="#"
@@ -155,10 +182,10 @@
 {/snippet}
 
 <div class="flex items-center justify-center text-sm">
-	{#each [{ label: 'Shop', render: ShopContent, content: 'And discover the full marketplace.' }, { label: 'Categories', href: '/categories', render: CategoriesContent, content: 'Browse an extensive range of products.' }, { label: 'Orders', render: OrdersContent, content: 'Track your shopping journey and manage your purchases.' }, { label: 'Account', render: AccountContent, content: 'Personalize your experience and your security.' }, { label: 'Support', href: '/support', content: 'Personalize your experience and manage your security settings.' }] as link}
+	{#each links as link (link.label)}
 		<Button
 			variant="ghost"
-			color={'secondary'}
+			color="secondary"
 			href={link.href ?? '#'}
 			class="font-normal text-primary hover:text-secondary"
 			onmouseenter={() => onHover(link)}
