@@ -22,6 +22,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse
 
 from django.contrib.auth.models import Group, Permission
 from config.logging import audit_log
@@ -45,6 +46,13 @@ from users.filters import UserFilter
 logger = logging.getLogger(__name__)
 
 
+@extend_schema_view(
+    create=extend_schema(summary="Register User", description="Public endpoint to register a new user."),
+    list=extend_schema(summary="List Users", description="List users based on role (Self/Staff/Superuser)."),
+    retrieve=extend_schema(summary="Retrieve User", description="Get a specific user's details."),
+    update=extend_schema(summary="Update User", description="Update a user's details."),
+    partial_update=extend_schema(summary="Partial Update User", description="Partially update a user's details."),
+)
 class UserManagementViewSet(viewsets.ModelViewSet):
     """
     ViewSet for user CRUD and admin lifecycle actions.
@@ -172,6 +180,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         return Response(response_data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(summary="Deactivate User", description="Temporarily disable a user account (staff only).")
     @action(detail=True, methods=["post"], url_path="deactivate")
     def deactivate(self, request, pk=None):
         """
@@ -193,6 +202,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(summary="Activate User", description="Re-enable a deactivated or soft-deleted user account (staff only).")
     @action(detail=True, methods=["post"], url_path="activate")
     def activate(self, request, pk=None):
         """
@@ -214,6 +224,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(summary="Soft Delete User", description="Mark user as deleted while preserving all data (reversible, staff only).")
     @action(detail=True, methods=["post"], url_path="soft-delete")
     def soft_delete(self, request, pk=None):
         """
@@ -235,6 +246,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @extend_schema(summary="Current User Profile", description="Return the authenticated user's own profile.")
     @action(detail=False, methods=["get"], url_path="me", permission_classes=[])
     def me(self, request):
         """
@@ -252,6 +264,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
+    @extend_schema(summary="Change Password", description="Change the authenticated user's password.")
     @action(detail=False, methods=["post"], url_path="change-password")
     def change_password(self, request):
         """
@@ -296,6 +309,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
     # --- SUPERUSER-ONLY ACTIONS ---
 
+    @extend_schema(summary="Set Staff Status", description="Grant or revoke staff status (superuser only).")
     @action(detail=True, methods=["post"], url_path="set-staff-status")
     def set_staff_status(self, request, pk=None):
         """
@@ -314,6 +328,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         return Response(ReadOnlyUserSerializer(user).data)
 
+    @extend_schema(summary="Set Superuser Status", description="Grant or revoke superuser status (superuser only).")
     @action(detail=True, methods=["post"], url_path="set-superuser-status")
     def set_superuser_status(self, request, pk=None):
         """
@@ -339,6 +354,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         return Response(ReadOnlyUserSerializer(user).data)
 
+    @extend_schema(summary="Manage Groups", description="Add or remove a user from permission groups (superuser only).")
     @action(detail=True, methods=["post"], url_path="manage-groups")
     def manage_groups(self, request, pk=None):
         """
@@ -373,6 +389,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @extend_schema(summary="Manage Permissions", description="Add or remove individual permissions from a user (superuser only).")
     @action(detail=True, methods=["post"], url_path="manage-permissions")
     def manage_permissions(self, request, pk=None):
         """

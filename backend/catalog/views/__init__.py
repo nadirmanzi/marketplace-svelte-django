@@ -1,0 +1,1 @@
+# catalog/views package

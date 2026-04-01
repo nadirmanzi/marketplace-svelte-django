@@ -1,1 +1,2 @@
-1. implement token blacklisting
+1. check why expired password login returns 200 in logs
+2. 

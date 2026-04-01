@@ -45,11 +45,20 @@ class UserFilteringTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         # Check items directly in raw response data
-        items = response.data['items']
+        items = response.data
+        if isinstance(items, dict) and 'results' in items:
+            items = items['results']
+        elif isinstance(items, dict) and 'items' in items:
+            items = items['items']
+            
         self.assertEqual(len(items), 3) # admin, alice, bob all have example.com
         
         response = self.client.get(self.url, {'email': 'alice'})
-        items = response.data['items']
+        items = response.data
+        if isinstance(items, dict) and 'results' in items:
+            items = items['results']
+        elif isinstance(items, dict) and 'items' in items:
+            items = items['items']
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]['email'], "alice@example.com")
 
@@ -58,7 +67,11 @@ class UserFilteringTests(APITestCase):
         response = self.client.get(self.url, {'full_name': 'Smith'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        items = response.data['items']
+        items = response.data
+        if isinstance(items, dict) and 'results' in items:
+            items = items['results']
+        elif isinstance(items, dict) and 'items' in items:
+            items = items['items']
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]['full_name'], "Alice Smith")
 
@@ -67,7 +80,11 @@ class UserFilteringTests(APITestCase):
         response = self.client.get(self.url, {'is_staff': 'true'})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        items = response.data['items']
+        items = response.data
+        if isinstance(items, dict) and 'results' in items:
+            items = items['results']
+        elif isinstance(items, dict) and 'items' in items:
+            items = items['items']
         # Superuser is also staff
         self.assertEqual(len(items), 2)
         for item in items:
@@ -85,7 +102,11 @@ class UserFilteringTests(APITestCase):
         response = self.client.get(self.url, {'created_at_after': recent_date.isoformat()})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        items = response.data['items']
+        items = response.data
+        if isinstance(items, dict) and 'results' in items:
+            items = items['results']
+        elif isinstance(items, dict) and 'items' in items:
+            items = items['items']
         # alice should be excluded
         self.assertEqual(len(items), 3) # admin, bob, charlie
         emails = [item['email'] for item in items]

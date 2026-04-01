@@ -1,4 +1,4 @@
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 from django.core.cache import cache
 from rest_framework import status
@@ -9,14 +9,6 @@ from users.services.management_services import UserManagementService
 
 User = get_user_model()
 
-@override_settings(REST_FRAMEWORK={
-    'EXCEPTION_HANDLER': 'config.exceptions.custom_exception_handler',
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'users.authentication.CustomJWTAuthentication',
-    ),
-    'DEFAULT_THROTTLE_CLASSES': [],
-    'DEFAULT_THROTTLE_RATES': {},
-})
 class AuthAndManagementTests(TestCase):
     def setUp(self):
         cache.clear()  # Reset throttle cache between tests
@@ -171,3 +163,29 @@ class AuthAndManagementTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.user.refresh_from_db()
         self.assertFalse(self.user.user_permissions.filter(codename="can_test").exists())
+
+    def test_zero_db_token_refresh(self):
+        """Test that token refresh minimizes DB queries for the user (allows 1 for rotation)."""
+        from django.test.utils import CaptureQueriesContext
+        from django.db import connection
+        from rest_framework_simplejwt.tokens import AccessToken
+        
+        url = reverse("user-token_refresh")
+        
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.post(url, {"refresh": self.refresh_token})
+            
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        new_access = response.data.get("access")
+        self.assertIsNotNone(new_access)
+        
+        user_queries = [q for q in queries.captured_queries if "users_user" in q["sql"]]
+        
+        # 1 PK lookup is unavoidable during blacklist creation (OutstandingToken uses a real ForeignKey to User)
+        # The key success is that it doesn't query the DB again to serialize claims.
+        self.assertLessEqual(len(user_queries), 1, f"Refresh token hit user table {len(user_queries)} times (expected <= 1)!")
+        
+        # Verify custom claims
+        token_obj = AccessToken(new_access)
+        self.assertIn("email", token_obj.payload)
+        self.assertEqual(token_obj.payload["email"], self.user_data["email"])

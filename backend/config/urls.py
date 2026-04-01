@@ -10,7 +10,7 @@ from django.urls import path, include
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("users/", include("users.urls")),
-    # path("products/", include("products.urls")),
+    path("catalog/", include("catalog.urls")),
     # API schema
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path(

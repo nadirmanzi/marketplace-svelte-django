@@ -81,9 +81,10 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "drf_spectacular",
+    "simple_history",
     # Core apps
     "users",
-    # "products",
+    "catalog",
 ]
 
 MIDDLEWARE = [
@@ -97,6 +98,7 @@ MIDDLEWARE = [
     "users.middleware.PasswordExpirationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

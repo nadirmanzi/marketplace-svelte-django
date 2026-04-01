@@ -21,10 +21,12 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, OpenApiResponse
+
 # Removed ScopedRateThrottle as we now use our custom specialized throttles
 
 from config.logging import audit_log
-from users.serializers import CustomTokenObtainPairSerializer
+from users.serializers import CustomTokenObtainPairSerializer, CustomTokenRefreshSerializer
 from users.throttling import LoginRateThrottle, UserActionThrottle
 
 
@@ -52,6 +54,11 @@ class LoginView(TokenObtainPairView):
     permission_classes = [AllowAny]
     throttle_classes = [LoginRateThrottle]
     
+    @extend_schema(
+        summary="User Login",
+        description="Authenticates user and returns JWT access + refresh tokens.",
+        responses={200: CustomTokenObtainPairSerializer, 403: OpenApiResponse(description="Password expired")}
+    )
     def post(self, request, *args, **kwargs):
         """Handle login request with custom token generation and audit logging."""
         serializer = self.get_serializer(data=request.data)
@@ -127,10 +134,15 @@ class CustomTokenRefreshView(TokenRefreshView):
     - New refresh token is returned
     - This prevents token reuse attacks
     """
+    serializer_class = CustomTokenRefreshSerializer
     permission_classes = [AllowAny]
     throttle_classes = [UserActionThrottle]
     # throttle_scope = 'user'  # No longer needed with UserActionThrottle
     
+    @extend_schema(
+        summary="Refresh Token",
+        description="Provides a new access token using a valid refresh token."
+    )
     def post(self, request, *args, **kwargs):
         """Handle token refresh with audit logging."""
         serializer = self.get_serializer(data=request.data)
@@ -178,6 +190,10 @@ class CustomTokenVerifyView(TokenVerifyView):
     throttle_classes = [UserActionThrottle]
     # throttle_scope = 'user'  # No longer needed with UserActionThrottle
     
+    @extend_schema(
+        summary="Verify Token",
+        description="Verifies the validity of a token (e.g. access or refresh)."
+    )
     def post(self, request, *args, **kwargs):
         """Handle token verification with audit logging."""
         serializer = self.get_serializer(data=request.data)
@@ -224,6 +240,11 @@ class LogoutView(APIView):
     throttle_classes = [UserActionThrottle]
     # throttle_scope = 'user'  # No longer needed with UserActionThrottle
     
+    @extend_schema(
+        summary="User Logout",
+        description="Blacklists the refresh token and invalidates the session.",
+        responses={200: OpenApiResponse(description="Successfully logged out."), 400: OpenApiResponse(description="Refresh token is required.")}
+    )
     def post(self, request):
         """Blacklist refresh token to logout user."""
         try:

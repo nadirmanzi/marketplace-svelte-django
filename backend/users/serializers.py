@@ -18,7 +18,10 @@ from django.db import IntegrityError, transaction
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import (
+    TokenObtainPairSerializer,
+    TokenRefreshSerializer,
+)
 
 from users.utils.validators import validate_and_normalize_phone
 from users.tokens import CustomRefreshToken
@@ -190,6 +193,37 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
         return CustomRefreshToken.for_user(user)
+
+
+class CustomTokenRefreshSerializer(TokenRefreshSerializer):
+    """
+    Custom refresh serializer that uses CustomRefreshToken to ensure 
+    zero-DB access token generation and preserves custom claims.
+    """
+    def validate(self, attrs):
+        from users.tokens import CustomRefreshToken
+        from rest_framework_simplejwt.settings import api_settings
+
+        refresh = CustomRefreshToken(attrs["refresh"])
+
+        data = {"access": str(refresh.access_token)}
+
+        if api_settings.ROTATE_REFRESH_TOKENS:
+            if api_settings.BLACKLIST_AFTER_ROTATION:
+                try:
+                    # Attempt to blacklist the given refresh token
+                    refresh.blacklist()
+                except AttributeError:
+                    # If blacklist app not installed, `blacklist` method will not be present
+                    pass
+
+            refresh.set_jti()
+            refresh.set_exp()
+            refresh.set_iat()
+
+            data["refresh"] = str(refresh)
+
+        return data
 
 
 # -------------------------
