@@ -40,12 +40,12 @@ RUN apt-get update && apt-get install -y \
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
 
-# Create a non-root user
-RUN addgroup --system django && \
-    adduser --system --group django
+# Create a non-root user with UID 1000 to match host permissions
+RUN addgroup --system --gid 1000 django && \
+    adduser --system --uid 1000 --group django
 
 # Create directories for static, media and logs files
-RUN mkdir -p /app/staticfiles /app/media /app/logs && \
+RUN mkdir -p /app/staticfiles /app/media/products /app/media/categories /app/logs && \
     chown -R django:django /app
 
 # Copy project files

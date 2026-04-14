@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# Ensure media and logs directories exist
+mkdir -p /app/media/products /app/media/categories /app/logs
+
 # Wait for postgres
 echo "Waiting for postgres..."
 while ! nc -z $POSTGRES_HOST $POSTGRES_PORT; do
