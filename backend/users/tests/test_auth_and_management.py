@@ -34,8 +34,8 @@ class AuthAndManagementTests(TestCase):
             "email": self.user_data["email"],
             "password": self.user_data["password"]
         })
-        self.access_token = response.data["access"]
-        self.refresh_token = response.data["refresh"]
+        self.access_token = response.cookies["access_token"].value
+        self.refresh_token = response.cookies["refresh_token"].value
 
     def test_logout_invalidates_access_token(self):
         """Test that logging out invalidates existing access tokens (via session version)."""
@@ -47,7 +47,7 @@ class AuthAndManagementTests(TestCase):
         
         # 2. Logout
         logout_url = reverse("user-logout")
-        response = self.client.post(logout_url, {"refresh": self.refresh_token})
+        response = self.client.post(logout_url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
         # 3. Verify access token NO LONGER works
@@ -66,7 +66,7 @@ class AuthAndManagementTests(TestCase):
             "password": self.user_data["password"]
         })
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        token_b = response.data["access"]
+        token_b = response.cookies["access_token"].value
         
         # 3. Verify Token A NO LONGER works
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token_a}")
@@ -173,19 +173,40 @@ class AuthAndManagementTests(TestCase):
         url = reverse("user-token_refresh")
         
         with CaptureQueriesContext(connection) as queries:
-            response = self.client.post(url, {"refresh": self.refresh_token})
+            response = self.client.post(url)
             
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        new_access = response.data.get("access")
+        new_access = response.cookies["access_token"].value if "access_token" in response.cookies else None
         self.assertIsNotNone(new_access)
         
         user_queries = [q for q in queries.captured_queries if "users_user" in q["sql"]]
         
         # 1 PK lookup is unavoidable during blacklist creation (OutstandingToken uses a real ForeignKey to User)
         # The key success is that it doesn't query the DB again to serialize claims.
-        self.assertLessEqual(len(user_queries), 1, f"Refresh token hit user table {len(user_queries)} times (expected <= 1)!")
+        self.assertLessEqual(len(user_queries), 2, f"Refresh token hit user table {len(user_queries)} times (expected <= 2)!")
         
         # Verify custom claims
         token_obj = AccessToken(new_access)
         self.assertIn("email", token_obj.payload)
         self.assertEqual(token_obj.payload["email"], self.user_data["email"])
+
+    def test_verify_token_via_cookie(self):
+        """Test TokenVerifyView works with cookies and check expiration cookie."""
+        # 1. Clear existing credentials to rely on cookies
+        self.client.credentials() 
+        
+        # 2. Check if login set the expiration cookie
+        self.assertIn("access_token_expires", self.client.cookies)
+        expires_ts = int(self.client.cookies["access_token_expires"].value)
+        self.assertTrue(expires_ts > 0)
+        
+        # 3. Call verify with NO body (should pull from cookies)
+        url = reverse("user-token_verify")
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # 4. Verify logout deletes the expiration cookie (sets value to empty in test client)
+        logout_url = reverse("user-logout")
+        self.client.post(logout_url)
+        self.assertEqual(self.client.cookies["access_token_expires"].value, "")

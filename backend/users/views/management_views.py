@@ -41,6 +41,7 @@ from users.models import User
 from users.throttling import UserActionThrottle, RegistrationRateThrottle
 from users.services.management_services import UserManagementService
 from users.filters import UserFilter
+from users.utils.cookies import set_auth_cookies
 
 
 logger = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
 
         if self.action == "me":
-            return [AllowAny(), IsAuthenticated()]
+            return [IsAuthenticated()]
         return [IsAuthenticated(), UserActionPermission()]
 
     def get_throttles(self):
@@ -148,6 +149,11 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             # Prevent aggressive scraping of user list
             from users.throttling import SearchRateThrottle
             return [SearchRateThrottle()]
+
+        if self.action == "change_password":
+            from users.throttling import SensitiveActionRateThrottle
+            return [SensitiveActionRateThrottle()]
+            
         return [UserActionThrottle()]
 
     def create(self, request, *args, **kwargs):
@@ -174,11 +180,16 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         response_data = ReadOnlyUserSerializer(user).data
 
-        # Tokens are attached to user instance by assign_tokens_on_creation signal
+        # Tokens are generated during creation; set them as cookies instead of in body
+        response = Response(response_data, status=status.HTTP_201_CREATED)
         if hasattr(user, "_auth_tokens"):
-            response_data["tokens"] = user._auth_tokens
+            return set_auth_cookies(
+                response, 
+                user._auth_tokens["access"], 
+                user._auth_tokens["refresh"]
+            )
 
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        return response
 
     @extend_schema(summary="Deactivate User", description="Temporarily disable a user account (staff only).")
     @action(detail=True, methods=["post"], url_path="deactivate")
@@ -247,7 +258,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         )
 
     @extend_schema(summary="Current User Profile", description="Return the authenticated user's own profile.")
-    @action(detail=False, methods=["get"], url_path="me", permission_classes=[])
+    @action(detail=False, methods=["get"], url_path="me")
     def me(self, request):
         """
         Return the authenticated user's own profile.
@@ -258,9 +269,6 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             200: Full user profile (ReadOnlyUserSerializer).
             401: If user is not authenticated.
         """
-        if not request.user.is_authenticated:
-            return Response({"detail": "Authentication required."}, status=status.HTTP_401_UNAUTHORIZED)
-            
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
@@ -283,8 +291,6 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         
         user = request.user
         user.set_password(serializer.validated_data["new_password"])
-        # Increment session version to invalidate OTHER sessions
-        user.session_version += 1
         user.save()
         
         # Log successful password change
@@ -297,15 +303,15 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             target_user_id=str(user.user_id),
         )
         
-        # Return new tokens so the user stays logged in
+        # Return new tokens in cookies so the user stays logged in
         from users.tokens import CustomRefreshToken
         refresh = CustomRefreshToken.for_user(user)
         
-        return Response({
-            "detail": "Password has been changed successfully.",
-            "refresh": str(refresh),
-            "access": str(refresh.access_token),
+        response = Response({
+            "detail": "Password has been changed successfully."
         }, status=status.HTTP_200_OK)
+        
+        return set_auth_cookies(response, str(refresh.access_token), str(refresh))
 
     # --- SUPERUSER-ONLY ACTIONS ---
 

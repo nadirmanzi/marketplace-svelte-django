@@ -99,6 +99,10 @@ class UserActionPermission(permissions.BasePermission):
             return False
         
         is_self = (obj == user)
+
+        # Prevent staff from deactivating/soft-deleting themselves
+        if is_self and view.action in ('deactivate', 'soft_delete'):
+            return False
         
         # Safe methods (GET, HEAD, OPTIONS) - retrieve action
         if request.method in permissions.SAFE_METHODS:

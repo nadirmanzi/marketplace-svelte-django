@@ -12,49 +12,13 @@ env = environ.Env(DEBUG=(bool, False))
 # pointing to backend/ instead of backend/config/settings
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Auto-detect environment and load appropriate .env file
-# Logic:
-# 1. Trust DOTENV_FILE if valid.
-# 2. If running production settings, load .env.production
-# 3. If running local settings, load .env.local
-# 4. Fallback to .env
-
-LOGGING = LOGGING
-
-
-def get_env_file(base_dir):
-    """Determine which .env file to load."""
-    # 1. Explicit override
-    custom_env = os.environ.get("DOTENV_FILE")
-    if custom_env:
-        return Path(custom_env)
-
-    # 2. Infer from Settings Module
-    # Note: manage.py might set a default, but this is usually safe for file existence checks
-    settings_module = os.environ.get("DJANGO_SETTINGS_MODULE", "")
-
-    if "production" in settings_module:
-        return base_dir / ".env.production"
-
-    if "local" in settings_module:
-        return base_dir / ".env.local"
-
-    # 3. Generic Fallback
-    return base_dir / ".env"
-
-
-ENV_FILE = get_env_file(BASE_DIR)
-
-# Read environment variables from the detected file
+# Environment Variable Configuration
+# Following Twelve-Factor App methodology:
+# 1. Prioritize actual system environment variables (Docker/Cloud context).
+# 2. Fallback to a local .env file only if it exists (Development context).
+ENV_FILE = BASE_DIR / ".env"
 if ENV_FILE.exists():
     environ.Env.read_env(str(ENV_FILE))
-    print(f"Loading environment from: {ENV_FILE.name}")
-else:
-    # If explicit file was expected but missing, specific environments might want to warn
-    # but we'll just log generic warning for now.
-    print(
-        f"WARNING: Environment file {ENV_FILE.name} not found. Using environment variables only."
-    )
 
 # Logging configuration (imported from separate module)
 # config.logging is now relative to backend root, which is in python path
@@ -82,6 +46,7 @@ INSTALLED_APPS = [
     "django_filters",
     "drf_spectacular",
     "simple_history",
+    "imagekit",
     # Core apps
     "users",
     "catalog",
@@ -89,8 +54,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -121,9 +86,10 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
-# Using env.db() to respect DATABASE_URL
+# Use PostgreSQL via DATABASE_URL if provided (preferred for Docker/Prod),
+# otherwise fallback to SQLite for local development.
 
-if env("ENVIRONMENT") == "production":
+if env("DATABASE_URL", default=None):
     DATABASES = {
         "default": env.db("DATABASE_URL"),
     }
@@ -135,7 +101,7 @@ elif env("ENVIRONMENT") == "local":
         },
     }
 else:
-    raise ValueError("Invalid environment")
+    raise ValueError("DATABASE_URL is required for production environment.")
 
 
 # Redis Cache
@@ -163,14 +129,22 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
+# Media files (Uploaded images, etc)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------- Custom settings ----------
 
 
+# Frontend Integration
+FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:5173")
+
 # CORS Configuration
-CORS_ALLOW_ALL_ORIGINS = env.bool("CORS_ALLOW_ALL_ORIGINS", default=True)
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [FRONTEND_URL, "http://api.localhost"]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = (
     *default_headers,
@@ -178,6 +152,9 @@ CORS_ALLOW_HEADERS = (
     "x-email-verification-key",
     "x-password-reset-key",
 )
+
+# CSRF Configuration
+CSRF_TRUSTED_ORIGINS = [FRONTEND_URL, "http://api.localhost", "http://backend:8000"]
 
 # Auth user model
 AUTH_USER_MODEL = "users.User"

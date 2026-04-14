@@ -50,12 +50,14 @@ class ThrottlingTests(APITestCase):
         # 1st attempt
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.client.cookies.clear()
         
         # 2nd attempt
         data['email'] = 'new2@example.com'
         data['telephone_number'] = '+16102451235'
         response = self.client.post(self.register_url, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.client.cookies.clear()
         
         # 3rd attempt should be throttled
         data['email'] = 'new3@example.com'

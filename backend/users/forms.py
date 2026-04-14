@@ -105,7 +105,7 @@ class UserCreationForm(forms.ModelForm):
             return None
         normalized = validate_and_normalize_phone(phone)
         # Check if normalized phone already exists among active users
-        if User.objects.filter(telephone_number=normalized).exists():
+        if User.objects.all_objects().filter(telephone_number=normalized).exists():
             raise ValidationError("A user with that phone number already exists.")
         return normalized
 
@@ -237,7 +237,7 @@ class UserChangeForm(forms.ModelForm):
             return None
         normalized = validate_and_normalize_phone(phone)
         # Check if normalized phone exists for another active user
-        qs = User.objects.filter(telephone_number=normalized)
+        qs = User.objects.all_objects().filter(telephone_number=normalized)
         if self.instance and self.instance.pk:
             qs = qs.exclude(user_id=self.instance.user_id)
         if qs.exists():

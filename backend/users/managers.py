@@ -95,8 +95,8 @@ class UserManager(BaseUserManager):
             - Verify deletion timestamp
 
         Examples:
-            User.objects.deleted().count()  # Number of deleted users
-            User.objects.deleted().filter(deleted_at__gte=cutoff_date)  # Recently deleted
+            User.objects.soft_deleted().count()  # Number of deleted users
+            User.objects.soft_deleted().filter(deleted_at__gte=cutoff_date)  # Recently deleted
         """
         return self.all_objects().filter(is_soft_deleted=True)
 

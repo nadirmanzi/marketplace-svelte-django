@@ -171,9 +171,10 @@ class UserAdmin(BaseUserAdmin):
     @admin.action(description="Force selected users to change password")
     def force_password_expiry(self, request, queryset):
         # Set password_changed_at to long ago
+        user_ids = list(queryset.values_list('user_id', flat=True))
         count = queryset.update(password_changed_at=timezone.now() - timedelta(days=365))
         
-        for user in queryset:
+        for user_id in user_ids:
             audit_log.warning(
                 action="admin.force_password_expiry",
                 message="Password expiry forced by admin",

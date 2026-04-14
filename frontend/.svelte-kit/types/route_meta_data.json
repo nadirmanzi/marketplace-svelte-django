@@ -1,8 +1,45 @@
 {
-	"/(main)": [],
-	"/": [],
-	"/auth": [],
-	"/auth/login": [],
-	"/(main)/browse": [],
-	"/(main)/categories": []
+	"/(main)": [
+		"src/routes/(main)/+page.server.ts",
+		"src/routes/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/": [
+		"src/routes/+layout.server.ts"
+	],
+	"/auth": [
+		"src/routes/+layout.server.ts"
+	],
+	"/auth/login": [
+		"src/routes/auth/login/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/auth/logout": [
+		"src/routes/auth/logout/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/auth/signup": [
+		"src/routes/auth/signup/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(main)/categories": [
+		"src/routes/(main)/categories/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(main)/orders": [
+		"src/routes/+layout.server.ts"
+	],
+	"/ui": [
+		"src/routes/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/ui/button": [
+		"src/routes/+layout.server.ts"
+	],
+	"/ui/input": [
+		"src/routes/+layout.server.ts"
+	],
+	"/ui/sheet": [
+		"src/routes/+layout.server.ts"
+	]
 }

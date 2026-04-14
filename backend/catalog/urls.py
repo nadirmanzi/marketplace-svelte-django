@@ -7,8 +7,10 @@ Routes:
 - /catalog/products/                -> Public product listing
 - /catalog/products/manage/         -> Owner/staff product CRUD
 - /catalog/variants/manage/         -> Owner/staff variant CRUD
+- /catalog/attributes/manage/       -> Staff attribute CRUD
 """
 
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from catalog.views.category_views import (
@@ -19,6 +21,10 @@ from catalog.views.product_views import (
     ProductPublicViewSet,
     ProductManagementViewSet,
     VariantManagementViewSet,
+)
+from catalog.views.attribute_views import (
+    AttributeViewSet,
+    CategoryAttributeInfoView,
 )
 
 router = DefaultRouter()
@@ -34,4 +40,11 @@ router.register(r"products", ProductPublicViewSet, basename="product")
 # Variants
 router.register(r"variants/manage", VariantManagementViewSet, basename="variant-manage")
 
-urlpatterns = router.urls
+# Attributes
+router.register(r"attributes/manage", AttributeViewSet, basename="attribute-manage")
+
+urlpatterns = [
+    path("categories/<uuid:category_id>/attributes/", CategoryAttributeInfoView.as_view(), name="category-attributes"),
+]
+
+urlpatterns += router.urls

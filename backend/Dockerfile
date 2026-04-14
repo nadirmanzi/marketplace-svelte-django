@@ -1,29 +1,62 @@
-FROM python:3.12-slim
+# Stage 1: Build virtual environment
+FROM python:3.12-slim as builder
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set work directory
 WORKDIR /app
 
-# Install system dependencies
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install python dependencies into a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+
+# Stage 2: Final runtime image
+FROM python:3.12-slim as runner
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+# Install runtime dependencies (like netcat for entrypoint and libpq for postgres)
+RUN apt-get update && apt-get install -y \
+    libpq5 \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python dependencies
-COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Copy virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
 
-# Copy project
-COPY . /app/
+# Create a non-root user
+RUN addgroup --system django && \
+    adduser --system --group django
 
-# Copy entrypoint script
-COPY scripts/entrypoint.sh /app/scripts/
-RUN sed -i 's/\r$//g' /app/scripts/entrypoint.sh
-RUN chmod +x /app/scripts/entrypoint.sh
+# Create directories for static, media and logs files
+RUN mkdir -p /app/staticfiles /app/media /app/logs && \
+    chown -R django:django /app
+
+# Copy project files
+COPY --chown=django:django . .
+
+# Copy and prepare entrypoint script
+COPY --chown=django:django scripts/entrypoint.sh ./scripts/
+RUN chmod +x ./scripts/entrypoint.sh
+
+# Run as non-root user
+USER django
 
 # Entrypoint
 ENTRYPOINT ["/app/scripts/entrypoint.sh"]

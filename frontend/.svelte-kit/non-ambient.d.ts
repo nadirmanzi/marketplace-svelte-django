@@ -27,7 +27,7 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/(main)" | "/" | "/auth" | "/auth/login" | "/(main)/browse" | "/(main)/categories";
+		RouteId(): "/(main)" | "/" | "/auth" | "/auth/login" | "/auth/logout" | "/auth/signup" | "/(main)/categories" | "/(main)/orders" | "/ui" | "/ui/button" | "/ui/input" | "/ui/sheet";
 		RouteParams(): {
 			
 		};
@@ -36,11 +36,17 @@ declare module "$app/types" {
 			"/": Record<string, never>;
 			"/auth": Record<string, never>;
 			"/auth/login": Record<string, never>;
-			"/(main)/browse": Record<string, never>;
-			"/(main)/categories": Record<string, never>
+			"/auth/logout": Record<string, never>;
+			"/auth/signup": Record<string, never>;
+			"/(main)/categories": Record<string, never>;
+			"/(main)/orders": Record<string, never>;
+			"/ui": Record<string, never>;
+			"/ui/button": Record<string, never>;
+			"/ui/input": Record<string, never>;
+			"/ui/sheet": Record<string, never>
 		};
-		Pathname(): "/" | "/auth/login" | "/browse" | "/categories";
+		Pathname(): "/" | "/auth/login" | "/auth/logout" | "/auth/signup" | "/categories" | "/orders" | "/ui" | "/ui/button" | "/ui/input" | "/ui/sheet";
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
-		Asset(): "/banner.webp" | string & {};
+		Asset(): "/robots.txt" | string & {};
 	}
 }

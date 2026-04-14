@@ -72,8 +72,8 @@ class PasswordExpirationMiddleware:
             self._log_expiration_block(request)
             return JsonResponse(
                 {
-                    "error": "password_expired",
                     "detail": "Your password has expired. Please change your password.",
+                    "code": "password_expired",
                     "change_password_url": "/users/management/change-password/",
                 },
                 status=403,
@@ -85,26 +85,47 @@ class PasswordExpirationMiddleware:
         """
         Manually attempt to authenticate the request using DRF authentication classes.
         This is needed because this middleware runs before DRF authentication.
+
+        DRF authenticators (e.g. JWTAuthentication) expect a DRF Request object —
+        they internally access request._request (the underlying WSGIRequest). In
+        middleware we only have the raw WSGIRequest, so we wrap it first.
         """
+        from rest_framework.request import Request as DRFRequest
         from rest_framework.settings import api_settings
-        
-        for authenticator_class in api_settings.DEFAULT_AUTHENTICATION_CLASSES:
+
+        # Collect authenticator instances from the configured classes
+        authenticator_classes = api_settings.DEFAULT_AUTHENTICATION_CLASSES
+        authenticators = []
+        for klass in authenticator_classes:
+            if isinstance(klass, str):
+                from django.utils.module_loading import import_string
+                klass = import_string(klass)
+            authenticators.append(klass())
+
+        # Wrap the raw WSGIRequest so DRF authenticators can access ._request
+        drf_request = DRFRequest(request, authenticators=authenticators)
+
+        for authenticator in authenticators:
             try:
-                # Import class string to class object
-                if isinstance(authenticator_class, str):
-                    from django.utils.module_loading import import_string
-                    authenticator_class = import_string(authenticator_class)
-                
-                authenticator = authenticator_class()
-                auth_result = authenticator.authenticate(request)
-                
+                auth_result = authenticator.authenticate(drf_request)
+
                 if auth_result is not None:
                     user, auth = auth_result
                     request.user = user
                     request.auth = auth
                     return
-            except Exception:
-                # Authentication failed, try next authenticator
+            except Exception as e:
+                from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken
+
+                if not isinstance(e, (AuthenticationFailed, InvalidToken)):
+                    audit_log.warning(
+                        action="user.middleware.authentication",
+                        message=f"Unexpected error during middleware authentication: {e}",
+                        status="failed",
+                        source="users.middleware.PasswordExpirationMiddleware",
+                        target_user_id=str(getattr(request.user, 'user_id', None)),
+                    )
+
                 continue
 
     def _is_exempt_url(self, request) -> bool:

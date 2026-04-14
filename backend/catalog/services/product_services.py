@@ -13,7 +13,9 @@ VariantService:
 - adjust_stock (row-locked via select_for_update)
 """
 
-from django.db import transaction, DatabaseError
+import re
+import string
+from django.db import transaction, DatabaseError, IntegrityError, models
 from django.db.models import F
 from django.core.exceptions import ValidationError as DjangoValidationError
 from config.logging import audit_log
@@ -24,6 +26,7 @@ from users.exceptions import (
 )
 
 from catalog.models import Product, ProductVariant
+from .attribute_services import AttributeValueService
 
 
 class ProductService:
@@ -47,19 +50,45 @@ class ProductService:
         Returns:
             Product: The newly created instance.
         """
+        attributes = data.pop("attributes", {})
         category = data.pop("category", None)
         category_instance = None
 
         if category:
             category_instance = cls._resolve_category(category)
 
+        user_id = data.pop("user_id", performed_by.pk)
+
         try:
             product = Product(
-                user=performed_by,
+                user_id=user_id,
                 category=category_instance,
                 **data,
             )
-            product.save()
+            
+            # Robust save with slug collision retry
+            max_retries = 10
+            last_error = None
+            for i in range(max_retries):
+                try:
+                    with transaction.atomic():
+                        product.save()
+                        last_error = None
+                        break
+                except (IntegrityError, DjangoValidationError) as e:
+                    last_error = e
+                    from django.utils.text import slugify
+                    product.slug = f"{slugify(product.name)}-{i+1}"
+
+                if isinstance(last_error, DjangoValidationError):
+                    raise ServiceValidationError("; ".join(msg for messages in last_error.message_dict.values() for msg in messages))
+                raise ConflictError("Could not generate a unique slug after 10 attempts.")
+
+            # Assign attributes (includes validation).
+            # Always validate when a category is set — even with no attributes, the
+            # service must enforce required-attribute rules on the category hierarchy.
+            if category_instance:
+                AttributeValueService.validate_and_assign(product, attributes or {}, is_variant=False)
 
             audit_log.info(
                 action="product.create",
@@ -102,7 +131,9 @@ class ProductService:
         Returns:
             Product: The updated instance.
         """
+        attributes = data.pop("attributes", None)
         category = data.pop("category", None)
+        user_id = data.pop("user_id", None)
 
         if category is not None:
             if category == "" or category is None:
@@ -110,12 +141,18 @@ class ProductService:
             else:
                 product.category = cls._resolve_category(category)
 
+        if user_id is not None:
+            product.user_id = user_id
+
         for field, value in data.items():
             if hasattr(product, field):
                 setattr(product, field, value)
 
         try:
             product.save()
+
+            if attributes is not None:
+                AttributeValueService.validate_and_assign(product, attributes, is_variant=False)
 
             audit_log.info(
                 action="product.update",
@@ -273,9 +310,27 @@ class VariantService:
         Returns:
             ProductVariant: The newly created instance.
         """
+        attributes = data.pop("attributes", {})
+        sku = data.pop("sku", None) or None  # treat blank string as None
         try:
             variant = ProductVariant(product=product, **data)
-            variant.save()
+
+            # Auto-generate SKU with collision retry (up to 10 attempts)
+            max_retries = 10
+            for attempt in range(max_retries):
+                variant.sku = sku if sku and attempt == 0 else cls._generate_sku(product)
+                try:
+                    with transaction.atomic():
+                        variant.save()
+                    break
+                except IntegrityError:
+                    if attempt == max_retries - 1:
+                        raise ConflictError("Could not generate a unique SKU after 10 attempts.")
+                    sku = None  # force regeneration on next loop
+
+            # Assign attributes (includes validation against category hierarchy)
+            if attributes:
+                AttributeValueService.validate_and_assign(variant, attributes, is_variant=True)
 
             audit_log.info(
                 action="variant.create",
@@ -320,6 +375,7 @@ class VariantService:
         Returns:
             ProductVariant: The updated instance.
         """
+        attributes = data.pop("attributes", None)
         # Stock should only be changed via adjust_stock for safety
         data.pop("stock_quantity", None)
 
@@ -329,6 +385,9 @@ class VariantService:
 
         try:
             variant.save()
+
+            if attributes is not None:
+                AttributeValueService.validate_and_assign(variant, attributes, is_variant=True)
 
             audit_log.info(
                 action="variant.update",
@@ -396,8 +455,15 @@ class VariantService:
                 f"requested delta: {quantity_delta}."
             )
 
-        locked_variant.stock_quantity = new_quantity
-        locked_variant.save(update_fields=["stock_quantity", "updated_at"])
+        # Explicitly update via F expression bypassing full_clean triggers
+        # while keeping the queryset row-level lock from select_for_update
+        ProductVariant.objects.filter(pk=variant.pk).update(
+            stock_quantity=F("stock_quantity") + quantity_delta,
+            updated_at=models.functions.Now()
+        )
+
+        # Re-fetch for audit logging and response
+        locked_variant.refresh_from_db()
 
         audit_log.info(
             action="variant.adjust_stock",
@@ -417,6 +483,31 @@ class VariantService:
             },
         )
         return locked_variant
+
+    @staticmethod
+    def _generate_sku(product) -> str:
+        """
+        Generate a unique SKU candidate in the format {PREFIX}-{RANDOM}.
+
+        PREFIX: first 6 uppercase alphanumeric chars from the product slug.
+        RANDOM: 6 uppercase Base36 chars from uuid4 entropy.
+
+        Example: product slug 'nike-air-max' → SKU 'NIKEAI-4X7K2M'
+        """
+        import uuid
+        # Derive a clean uppercase prefix from the slug
+        prefix = re.sub(r'[^A-Z0-9]', '', product.slug.upper())[:6].ljust(3, 'X')
+
+        # Convert uuid4 int to 6-char Base36 (digits + uppercase letters)
+        chars = string.digits + string.ascii_uppercase  # 36 chars
+        num = uuid.uuid4().int % (36 ** 6)
+        result = []
+        for _ in range(6):
+            result.append(chars[num % 36])
+            num //= 36
+        random_part = ''.join(reversed(result))
+
+        return f"{prefix}-{random_part}"
 
     @classmethod
     @transaction.atomic

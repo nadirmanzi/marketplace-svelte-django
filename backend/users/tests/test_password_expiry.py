@@ -31,7 +31,7 @@ class PasswordExpiryTests(APITestCase):
         if response.status_code != status.HTTP_200_OK:
             print(f"DEBUG NOT EXPIRED LOGIN: {response.status_code}, {response.data}")
             
-        token = response.data['access']
+        token = response.cookies['access_token'].value
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         
         response = self.client.get(self.url)
@@ -53,13 +53,13 @@ class PasswordExpiryTests(APITestCase):
         self.assertEqual(response.data['error'], "password_expired")
         
         # But tokens should still be present
-        token = response.data['access']
+        token = response.cookies['access_token'].value
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         
         # Accessing protected view should be blocked
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.json()['error'], "password_expired")
+        self.assertEqual(response.json()['code'], "password_expired")
 
     def test_superuser_exempt_from_expiry(self):
         """Test that superusers are exempt from password expiry blocks."""
@@ -77,7 +77,7 @@ class PasswordExpiryTests(APITestCase):
         if response.status_code != status.HTTP_200_OK:
              print(f"DEBUG SUPERUSER LOGIN: {response.status_code}, {response.data}")
              
-        token = response.data['access']
+        token = response.cookies['access_token'].value
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         
         # Expire admin password
@@ -95,7 +95,7 @@ class PasswordExpiryTests(APITestCase):
             'email': self.user.email,
             'password': 'ComplexPassword123!'
         })
-        token = response.data['access']
+        token = response.cookies['access_token'].value
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         
         response = self.client.get(self.url)

@@ -46,7 +46,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     full_name = models.CharField(max_length=255)
     telephone_number = models.CharField(
-        max_length=32, unique=True, null=True, blank=True, db_index=True
+        max_length=32, null=True, blank=True, db_index=True
     )
 
     # Account status
@@ -91,6 +91,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
         # Count other superusers
         return type(self).objects.filter(is_superuser=True).exclude(pk=self.pk).count() == 0
+
+    def rotate_session(self):
+        """Increment session_version to invalidate all existing tokens. Does not save."""
+        self.session_version += 1
 
     class Meta:
         ordering = ["-created_at"]

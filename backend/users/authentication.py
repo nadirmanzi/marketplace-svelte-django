@@ -7,6 +7,7 @@ Also checks for soft-deleted users.
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken
 from django.utils.translation import gettext_lazy as _
+from django.conf import settings
 from config.logging import audit_log
 
 
@@ -19,9 +20,30 @@ class CustomJWTAuthentication(JWTAuthentication):
     """
     
     def authenticate(self, request):
-        """Override to capture request for logging."""
+        """
+        Override to capture request for logging and support cookie-based JWT.
+        Checks cookies first for 'access_token', then falls back to Authorization header.
+        """
         self.request = request
-        return super().authenticate(request)
+        
+        # Check header first Native DRF approach
+        header = self.get_header(request)
+        if header is None:
+            # Fallback to cookies
+            raw_token = request.COOKIES.get("access_token")
+            if raw_token is None:
+                return None
+        else:
+            raw_token = self.get_raw_token(header)
+            if raw_token is None:
+                return None
+
+        # Ensure raw_token is bytes before passing into SimpleJWT's validator
+        if isinstance(raw_token, str):
+            raw_token = raw_token.encode("utf-8")
+
+        validated_token = self.get_validated_token(raw_token)
+        return self.get_user(validated_token), validated_token
     
     def get_user(self, validated_token):
         """

@@ -1,20 +1,14 @@
 <script lang="ts">
-	import primaryLogo from '$lib/assets/primary-logo.svg';
-	import darkLogo from '$lib/assets/dark-logo.svg';
-	import lightLogo from '$lib/assets/light-logo.svg';
+	import blackLogo from '$lib/assets/black-logo.svg';
+	import whiteLogo from '$lib/assets/white-logo.svg';
 	import { cn } from '$lib/utils';
 
-	let {
-		variant = 'primary',
-		class: className = ''
-	}: { variant?: 'primary' | 'dark' | 'light'; class?: string } = $props();
+	type LogoProps = {
+		color?: 'black' | 'white';
+		class?: string;
+	};
+
+	let { color, class: className }: LogoProps = $props();
 </script>
 
-<a href="/">
-	<enhanced:img
-		src={variant === 'primary' ? primaryLogo : variant === 'dark' ? darkLogo : lightLogo}
-		alt="[marketplace] Logo"
-		fetchpriority="high"
-		class={cn('size-8', className)}
-	/>
-</a>
+<img src={color === 'black' ? blackLogo : whiteLogo} alt="" class={cn(className)} />

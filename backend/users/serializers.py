@@ -88,11 +88,6 @@ class ReadOnlyUserSerializer(serializers.ModelSerializer):
             "email",
             "full_name",
             "telephone_number",
-            "is_active",
-            "is_staff",
-            "is_superuser",
-            "is_soft_deleted",
-            "session_version",
             "password_changed_at",
             "password_expired",
             "created_at",
@@ -134,12 +129,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         except DjangoValidationError as e:
             raise serializers.ValidationError(str(e.messages[0]))
 
-        if (
-            User.objects.filter(telephone_number=normalized_phone, is_active=True)
-            .exclude(is_soft_deleted=True)
-            .exists()
-        ):
-            raise serializers.ValidationError("Active user with this phone number already exists.")
+        if User.objects.all_objects().filter(telephone_number=normalized_phone).exists():
+            raise serializers.ValidationError("A user with this phone number already exists.")
         return normalized_phone
 
     def validate_password(self, value):
@@ -175,11 +166,13 @@ class UpdateUserSerializer(UserUpdateMixin, serializers.ModelSerializer):
             raise serializers.ValidationError(str(e.messages[0]))
 
         if (
-            User.objects.exclude(pk=self.instance.pk)
-            .filter(telephone_number=normalized_phone, is_active=True)
+            User.objects.all_objects()
+            .exclude(pk=self.instance.pk)
+            .filter(telephone_number=normalized_phone)
             .exists()
         ):
-            raise serializers.ValidationError("Another active user already has this phone number.")
+            raise serializers.ValidationError("Another user already has this phone number.")
+        
         return normalized_phone
 
 

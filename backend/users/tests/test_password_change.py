@@ -34,8 +34,8 @@ class PasswordChangeTests(APITestCase):
         
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.data['error'], 'password_expired')
-        self.assertIn('access', response.data)
-        self.assertIn('refresh', response.data)
+        self.assertIn('access_token', response.cookies)
+        self.assertIn('refresh_token', response.cookies)
 
     def test_expired_user_can_only_change_password(self):
         """Test that expired user is blocked from others but allowed on change-password."""
@@ -47,7 +47,7 @@ class PasswordChangeTests(APITestCase):
             'email': self.user.email,
             'password': 'ComplexPassword123!'
         })
-        token = response.data['access']
+        token = response.cookies['access_token'].value
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         
         # Blocked from profile
@@ -70,7 +70,7 @@ class PasswordChangeTests(APITestCase):
             'email': self.user.email,
             'password': 'ComplexPassword123!'
         })
-        token = response.data['access']
+        token = response.cookies['access_token'].value
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token}')
         
         # Change password
@@ -81,9 +81,9 @@ class PasswordChangeTests(APITestCase):
         })
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn('access', response.data)
+        self.assertIn('access_token', response.cookies)
         
-        new_token = response.data['access']
+        new_token = response.cookies['access_token'].value
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {new_token}')
         
         # Now allowed on profile

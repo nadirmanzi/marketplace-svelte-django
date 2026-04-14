@@ -13,7 +13,7 @@ python manage.py migrate
 
 # Create superuser
 echo "Ensuring superuser exists..."
-python manage.py ensure_admin
+python manage.py init_admin
 
 # Collect static files
 echo "Collecting static files..."

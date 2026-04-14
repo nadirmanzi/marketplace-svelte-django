@@ -12,7 +12,7 @@ Methods:
 - activate_category: Toggle is_active=True.
 """
 
-from django.db import transaction, DatabaseError
+from django.db import transaction, DatabaseError, IntegrityError
 from django.core.exceptions import ValidationError as DjangoValidationError
 from config.logging import audit_log
 from users.exceptions import (
@@ -56,8 +56,31 @@ class CategoryService:
 
         try:
             category = Category(parent=parent_instance, **data)
-            category.save()
+            
+            # Explicitly handle slug collisions if name was provided
+            if not category.slug and category.name:
+                from django.utils.text import slugify
+                category.slug = slugify(category.name)
 
+            # Robust save with collision retry
+            max_retries = 10
+            last_error = None
+            for i in range(max_retries):
+                try:
+                    with transaction.atomic():
+                        category.save()
+                        last_error = None
+                        break
+                except (IntegrityError, DjangoValidationError) as e:
+                    last_error = e
+                    from django.utils.text import slugify
+                    category.slug = f"{slugify(category.name)}-{i+1}"
+            
+            if last_error:
+                if isinstance(last_error, DjangoValidationError):
+                    raise ServiceValidationError("; ".join(msg for messages in last_error.message_dict.values() for msg in messages))
+                raise ConflictError("Could not generate a unique slug after 10 attempts.")
+            
             audit_log.info(
                 action="category.create",
                 message=f"Category created: {category.name} ({category.category_id})",

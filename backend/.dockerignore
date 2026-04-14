@@ -24,7 +24,11 @@ wheels/
 .git/
 .gitignore
 .env
+.env.local
+.env.production
 db.sqlite3
+media/
+staticfiles/
 .pytest_cache/
 .coverage
 htmlcov/

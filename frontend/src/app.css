@@ -1,111 +1,83 @@
-/* Fonts */
 @import 'tailwindcss';
-@import '@fontsource-variable/nunito';
-@import '@fontsource-variable/raleway';
-@import 'tw-animate-css';
 
+@import '@skeletonlabs/skeleton';
+@import '@skeletonlabs/skeleton-svelte';
+
+@import '@fontsource-variable/figtree/wght.css';
+@import '@fontsource-variable/plus-jakarta-sans/wght.css';
 @theme {
-	/* main backgrounds */
-	--color-background: #f0f0f0;
+	/* PRIMARY — Electric Blue #0066ff */
+	--color-primary: oklch(25% 0 0);
+	--color-primary-hover: oklch(15% 0 0);
+	--color-on-primary: oklch(100% 0 0);
+	/* --color-primary: oklch(55% 0.22 260);
+	--color-primary-hover: oklch(48% 0.22 260);
+	--color-on-primary: oklch(100% 0 0); */
 
-	/* main foregrounds */
-	--color-foreground: oklch(21.66% 0.0099 67.3);
-	--color-foreground-secondary: oklch(50.53% 0.0093 73.7);
+	/* Primary Tonal */
+	--color-primary-tonal: oklch(95% 0.05 260);
+	--color-primary-tonal-hover: oklch(90% 0.08 260);
+	--color-on-primary-tonal: oklch(35% 0.15 260);
 
-	/* navigation */
-	--color-nav-background: oklch(100% 0 0);
-	--color-nav-border: oklch(92% 0.0046 78.3);
-	--color-nav-foreground: var(--color-foreground);
-	--color-nav-foreground-secondary: var(--color-foreground-secondary);
-	--color-nav-hover-background: var(--color-ghost);
+	/* SECONDARY — Vivid Orange #ff6600 */
+	--color-secondary: oklch(67% 0.22 45);
+	--color-secondary-hover: oklch(60% 0.22 45);
+	--color-on-secondary: oklch(100% 0 0);
 
-	/* COLORS */
+	/* Secondary Tonal */
+	--color-secondary-tonal: oklch(93% 0.05 45);
+	--color-secondary-tonal-hover: oklch(89% 0.08 45);
+	--color-on-secondary-tonal: oklch(38% 0.15 45);
 
-	/* primary */
-	/* --color-primary: oklch(60% 0.0384 121.7);
-	--color-primary-foreground: var(--color-foreground);
-	--color-primary-hover: oklch(70% 0.0384 121.7);
-	--color-primary-active: oklch(80% 0.0384 121.7);
-	--color-primary-light: oklch(80% 0.0384 121.7 / 0.2);
-	--color-primary-light-hover: oklch(90% 0.0384 121.7 / 0.3);
-	--color-primary-light-active: oklch(90% 0.0384 121.7 / 0.4); */
+	/* DESTRUCTIVE — Red */
+	--color-destructive: oklch(55% 0.18 27);
+	--color-destructive-hover: oklch(48% 0.18 27);
+	--color-on-destructive: oklch(100% 0 0);
 
-	--color-primary: oklch(65% 0.2176 38);
-	--color-primary-foreground: #ffffff;
-	--color-primary-hover: oklch(60% 0.2176 38);
-	--color-primary-active: var(--color-primary);
-	--color-primary-light: oklch(65% 0.2176 38 / 0.1);
-	--color-primary-light-hover: oklch(65% 0.2176 38 / 0.2);
-	--color-primary-light-active: oklch(65% 0.2176 38 / 0.3);
+	--color-destructive-tonal: oklch(92% 0.04 25);
+	--color-destructive-tonal-hover: oklch(88% 0.06 25);
+	--color-on-destructive-tonal: oklch(38% 0.14 27);
 
-	/* secondary */
-	--color-secondary: oklch(55% 0.223 255.42);
-	--color-secondary-foreground: #ffffff;
-	--color-secondary-hover: oklch(50% 0.223 255.42);
-	--color-secondary-active: var(--color-secondary);
-	--color-secondary-light: oklch(55% 0.223 255.42 / 0.1);
-	--color-secondary-light-hover: oklch(55% 0.223 255.42 / 0.2);
-	--color-secondary-light-active: oklch(55% 0.223 255.42 / 0.3);
+	/* SUCCESS — Green */
+	--color-success: oklch(62% 0.2 155);
+	--color-success-hover: oklch(56% 0.12 155);
+	--color-on-success: oklch(18% 0 0);
 
-	/* ghost */
-	--color-ghost: oklch(93% 0 0);
-	--color-ghost-foreground: var(--color-foreground);
-	--color-ghost-hover: oklch(87% 0 0);
-	--color-ghost-active: var(--color-ghost);
+	--color-success-tonal: oklch(92% 0.04 155);
+	--color-success-tonal-hover: oklch(88% 0.06 155);
+	--color-on-success-tonal: oklch(32% 0.1 155);
 
-	/* destructive */
-	--color-destructive: oklch(55% 0.221 29.2);
-	--color-destructive-foreground: #ffffff;
-	--color-destructive-hover: oklch(50% 0.221 29.2);
-	--color-destructive-active: var(--color-destructive);
-	--color-destructive-light: oklch(55% 0.221 29.2 / 0.1);
-	--color-destructive-light-hover: oklch(55% 0.221 29.2 / 0.2);
-	--color-destructive-light-active: oklch(55% 0.221 29.2 / 0.3);
+	/* MUTED */
+	--color-surface-foreground-muted: oklch(60% 0 0);
 
-	/* success */
-	--color-success: oklch(53.24% 0.163 142.5);
-	--color-success-foreground: #ffffff;
-	--color-success-hover: oklch(43.24% 0.163 142.5);
-	--color-success-active: var(--color-success);
-	--color-success-light: oklch(53.24% 0.163 142.5 / 0.1);
-	--color-success-light-hover: oklch(53.24% 0.163 142.5 / 0.2);
-	--color-success-light-active: oklch(53.24% 0.163 142.5 / 0.3);
+	/* SURFACES */
+	--color-background: oklch(96% 0 0);
+	--color-background-hover: oklch(92% 0 0);
+	--color-foreground: oklch(16% 0 0);
+	--color-surface: oklch(100% 0 0);
+	--color-surface-hover: oklch(96% 0 0);
+	--color-on-surface: oklch(16% 0 0);
 
-	/* separator */
-	--color-separator: oklch(92% 0 0);
-	--color-separator-secondary: oklch(80% 0 0);
+	/* BORDERS */
+	/* --color-surface-bo */
 
-	/* main borders */
-	--color-border: oklch(91.65% 0.0046 78.3);
-	--color-border-secondary: oklch(90% 0 0);
+	/* NAVIGATION */
+	--color-nav-bg: oklch(10% 0 0 / 0.9);
+	--color-nav-bg-hover: oklch(100% 0 0 / 0.15);
+	--color-nav-bg-muted: oklch(70% 0 0 / 0.15);
+	--color-nav-foreground: oklch(100% 0 0);
+	--color-nav-foreground-muted: oklch(60% 0 0);
+	--color-nav-pill-bg: oklch(100% 0 0);
+	--color-nav-pill-foreground: var(--color-foreground);
+	--color-nav-border: oklch(100% 0 0 / 0.15);
 
-	/* text sizes */
-	--text-sm: 0.85rem;
-
-	/* input */
-	--color-input-background: oklch(100% 0 0);
-	--color-input-hover: oklch(98% 0 0);
-	--color-input-foreground: var(--color-foreground);
-	--color-input-border: oklch(85% 0 0);
-	--color-input-focus: oklch(98% 0 0);
-
-	--font-display: 'Raleway Variable', sans-serif;
+	/* FONTS */
+	--font-default: 'Figtree Variable', sans-serif;
+	--font-display: 'Plus Jakarta Sans Variable', sans-serif;
 }
 
-@layer base {
-	body {
-		font-family: 'Nunito Variable', sans-serif;
-		color: var(--color-foreground);
-		font-weight: 500;
-	}
-
-	h1,
-	h2,
-	h3,
-	h4,
-	h5,
-	h6 {
-		font-family: 'Raleway Variable', sans-serif;
-		font-weight: 700;
-	}
+body {
+	font-family: 'Figtree Variable', sans-serif;
+	font-size: 1.05rem;
+	user-select: none;
 }

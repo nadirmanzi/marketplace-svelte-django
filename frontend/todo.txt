@@ -1,0 +1,1 @@
+1. stop animatedpillitem from starting at the first item when hovering on another item in the list causing the pill to go from first item to the hovered item which is annoying

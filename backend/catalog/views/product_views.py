@@ -171,9 +171,17 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
         serializer = ProductWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        data = serializer.validated_data
+        assigned_user = data.pop("user", None)
+        
+        if request.user.is_staff or request.user.is_superuser:
+            data["user_id"] = assigned_user or request.user.pk
+        else:
+            data["user_id"] = request.user.pk
+
         product = ProductService.create_product(
             performed_by=request.user,
-            **serializer.validated_data,
+            **data,
         )
         return Response(
             ProductSerializer(product).data,
@@ -185,10 +193,16 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
         serializer = ProductWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        data = serializer.validated_data
+        assigned_user = data.pop("user", None)
+        
+        if assigned_user and (request.user.is_staff or request.user.is_superuser):
+            data["user_id"] = assigned_user
+
         product = ProductService.update_product(
             performed_by=request.user,
             product=product,
-            **serializer.validated_data,
+            **data,
         )
         return Response(ProductSerializer(product).data)
 
@@ -197,10 +211,16 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
         serializer = ProductWriteSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
 
+        data = serializer.validated_data
+        if "user" in data:
+            assigned_user = data.pop("user")
+            if assigned_user and (request.user.is_staff or request.user.is_superuser):
+                data["user_id"] = assigned_user
+
         product = ProductService.update_product(
             performed_by=request.user,
             product=product,
-            **serializer.validated_data,
+            **data,
         )
         return Response(ProductSerializer(product).data)
 
