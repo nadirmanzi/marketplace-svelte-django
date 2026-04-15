@@ -664,6 +664,41 @@ class Discount(models.Model):
         if self.end_date and self.start_date and self.end_date <= self.start_date:
             raise ValidationError({"end_date": "End date must be after the start date."})
 
+        # Fixed amount validation: ensure it's not higher than the price of any associated item
+        if self.discount_type == self.DiscountType.FIXED_AMOUNT and self.pk:
+            # 1. Check directly linked Products
+            min_product_price = self.products.aggregate(
+                models.Min('base_price')
+            )['base_price__min']
+            if min_product_price and self.value > min_product_price:
+                raise ValidationError(
+                    {"value": f"Fixed discount ({self.value}) cannot exceed the base price of an associated product ({min_product_price})."}
+                )
+
+            # 2. Check directly linked Variants (accounting for price inheritance)
+            min_variant_price = self.variants.annotate(
+                eff_price=models.Case(
+                    models.When(price__isnull=False, then='price'),
+                    default='product__base_price',
+                    output_field=models.DecimalField()
+                )
+            ).aggregate(models.Min('eff_price'))['eff_price__min']
+            if min_variant_price and self.value > min_variant_price:
+                raise ValidationError(
+                    {"value": f"Fixed discount ({self.value}) cannot exceed the price of an associated variant ({min_variant_price})."}
+                )
+
+            # 3. Check items in linked Categories
+            # This checks all products directly in the categories.
+            # For brevity and performance in clean(), we check immediate products.
+            cat_min_price = Product.objects.filter(
+                category__in=self.categories.all()
+            ).aggregate(models.Min('base_price'))['base_price__min']
+            if cat_min_price and self.value > cat_min_price:
+                raise ValidationError(
+                    {"value": f"Fixed discount ({self.value}) cannot exceed the base price of products in the linked category ({cat_min_price})."}
+                )
+
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
