@@ -13,8 +13,6 @@ VariantService:
 - adjust_stock (row-locked via select_for_update)
 """
 
-import re
-import string
 from django.db import transaction, DatabaseError, IntegrityError, models
 from django.db.models import F
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -314,19 +312,9 @@ class VariantService:
         sku = data.pop("sku", None) or None  # treat blank string as None
         try:
             variant = ProductVariant(product=product, **data)
-
-            # Auto-generate SKU with collision retry (up to 10 attempts)
-            max_retries = 10
-            for attempt in range(max_retries):
-                variant.sku = sku if sku and attempt == 0 else cls._generate_sku(product)
-                try:
-                    with transaction.atomic():
-                        variant.save()
-                    break
-                except IntegrityError:
-                    if attempt == max_retries - 1:
-                        raise ConflictError("Could not generate a unique SKU after 10 attempts.")
-                    sku = None  # force regeneration on next loop
+            if sku:
+                variant.sku = sku
+            variant.save()
 
             # Assign attributes (includes validation against category hierarchy)
             if attributes:
@@ -483,31 +471,6 @@ class VariantService:
             },
         )
         return locked_variant
-
-    @staticmethod
-    def _generate_sku(product) -> str:
-        """
-        Generate a unique SKU candidate in the format {PREFIX}-{RANDOM}.
-
-        PREFIX: first 6 uppercase alphanumeric chars from the product slug.
-        RANDOM: 6 uppercase Base36 chars from uuid4 entropy.
-
-        Example: product slug 'nike-air-max' → SKU 'NIKEAI-4X7K2M'
-        """
-        import uuid
-        # Derive a clean uppercase prefix from the slug
-        prefix = re.sub(r'[^A-Z0-9]', '', product.slug.upper())[:6].ljust(3, 'X')
-
-        # Convert uuid4 int to 6-char Base36 (digits + uppercase letters)
-        chars = string.digits + string.ascii_uppercase  # 36 chars
-        num = uuid.uuid4().int % (36 ** 6)
-        result = []
-        for _ in range(6):
-            result.append(chars[num % 36])
-            num //= 36
-        random_part = ''.join(reversed(result))
-
-        return f"{prefix}-{random_part}"
 
     @classmethod
     @transaction.atomic

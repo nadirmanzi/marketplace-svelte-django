@@ -1,8 +1,10 @@
 import uuid
+import re
+import string
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import IntegrityError, models, transaction
 from simple_history.models import HistoricalRecords
 
 from catalog.managers import ProductVariantManager
@@ -110,8 +112,33 @@ class ProductVariant(models.Model):
             )
 
     def save(self, *args, **kwargs):
+        # Ensure SKU is auto-generated for admin/direct model saves too.
+        if not self.sku:
+            self.sku = self._generate_sku()
+
         self.full_clean()
-        super().save(*args, **kwargs)
+
+        # Guard against race/collision on unique SKU.
+        if self.sku:
+            try:
+                super().save(*args, **kwargs)
+                return
+            except IntegrityError:
+                if kwargs.get("force_insert", False):
+                    raise
+
+        max_retries = 10
+        for _ in range(max_retries):
+            self.sku = self._generate_sku()
+            self.full_clean()
+            try:
+                with transaction.atomic():
+                    super().save(*args, **kwargs)
+                return
+            except IntegrityError:
+                continue
+
+        raise ValidationError({"sku": "Could not generate a unique SKU after 10 attempts."})
 
     @property
     def in_stock(self) -> bool:
@@ -120,3 +147,20 @@ class ProductVariant(models.Model):
     @property
     def effective_price(self) -> Decimal:
         return self.price if self.price is not None else self.product.base_price
+
+    def _generate_sku(self) -> str:
+        """
+        Generate SKU in format {PREFIX}-{RANDOM}.
+        """
+        slug = getattr(self.product, "slug", "") or ""
+        prefix = re.sub(r"[^A-Z0-9]", "", slug.upper())[:6].ljust(3, "X")
+
+        chars = string.digits + string.ascii_uppercase
+        num = uuid.uuid4().int % (36**6)
+        result = []
+        for _ in range(6):
+            result.append(chars[num % 36])
+            num //= 36
+        random_part = "".join(reversed(result))
+
+        return f"{prefix}-{random_part}"
