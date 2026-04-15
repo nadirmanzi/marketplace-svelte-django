@@ -95,7 +95,7 @@ class Discount(models.Model):
                 ProductVariant.objects.filter(product_id__in=product_ids)
                 .annotate(
                     eff_price=models.Case(
-                        models.When(price__isnull=False, then="price"),
+                        models.When(base_price__isnull=False, then="base_price"),
                         default="product__base_price",
                         output_field=models.DecimalField(),
                     )
@@ -122,7 +122,7 @@ class Discount(models.Model):
             min_variant_price = (
                 self.variants.annotate(
                     eff_price=models.Case(
-                        models.When(price__isnull=False, then="price"),
+                        models.When(base_price__isnull=False, then="base_price"),
                         default="product__base_price",
                         output_field=models.DecimalField(),
                     )

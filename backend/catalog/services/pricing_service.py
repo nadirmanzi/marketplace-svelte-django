@@ -2,7 +2,7 @@
 Final pricing service for sellable product variants.
 
 Source of truth:
-- original_price: variant price (or inherited product base_price)
+- base_price: variant base_price (or inherited product base_price)
 - final_price: discounted price when a matching active discount exists
 """
 
@@ -13,7 +13,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.db.models import QuerySet
 
-from catalog.models import Category, Discount, ProductVariant
+from catalog.models import Category, Discount, Product, ProductVariant
 
 
 TWO_DP = Decimal("0.01")
@@ -21,7 +21,7 @@ TWO_DP = Decimal("0.01")
 
 @dataclass(frozen=True)
 class PricingResult:
-    original_price: Decimal
+    base_price: Decimal
     final_price: Decimal
     discount_amount: Decimal
     has_discount: bool
@@ -31,15 +31,10 @@ class PricingResult:
     applied_discount_value: Decimal | None
     applied_scope: str | None
 
-    @property
-    def base_price(self) -> Decimal:
-        # Backward-compat alias for callers using old field name.
-        return self.original_price
-
 
 class FinalPricingService:
     """
-    Resolves final pricing for product variants.
+    Resolves final pricing for models.
     """
 
     @classmethod
@@ -47,7 +42,7 @@ class FinalPricingService:
         """
         Return original and final prices for a sellable variant.
         """
-        base_price = variant.effective_price or Decimal("0.00")
+        base_price = variant.base_price if variant.base_price is not None else (variant.product.base_price if variant.product_id else Decimal("0.00"))
         discount = cls._resolve_discount_for_variant(variant)
         return cls._build_result(base_price=base_price, discount=discount)
 
@@ -55,6 +50,23 @@ class FinalPricingService:
     def for_variant(cls, *, variant: ProductVariant) -> PricingResult:
         # Backward-compat alias.
         return cls.get_variant_pricing(variant=variant)
+
+    @classmethod
+    def get_product_pricing(cls, *, product: Product) -> PricingResult:
+        """
+        Return original and final prices for a product.
+        """
+        base_price = product.base_price or Decimal("0.00")
+        discount = cls._resolve_discount_for_product(product)
+        return cls._build_result(base_price=base_price, discount=discount)
+
+    @classmethod
+    def get_category_discount(cls, *, category: Category) -> PricingResult:
+        """
+        Return discount information for a Category.
+        """
+        discount = cls._resolve_discount_for_category(category)
+        return cls._build_result(base_price=Decimal("0.00"), discount=discount)
 
     @staticmethod
     def _active_discounts() -> QuerySet:
@@ -68,32 +80,76 @@ class FinalPricingService:
         category > product > variant.
         """
         product = variant.product
-        effective_price = variant.effective_price or Decimal("0.00")
+        current_price = variant.base_price if variant.base_price is not None else (product.base_price if product else Decimal("0.00"))
+
+        category_ids = cls._category_ancestor_ids(product.category) if product else []
+        if category_ids:
+            category_discount = cls._pick_best_discount(
+                cls._active_discounts().filter(categories__in=category_ids).distinct(),
+                current_price,
+            )
+            if category_discount:
+                return category_discount, "category"
+
+        if product:
+            product_discount = cls._pick_best_discount(
+                cls._active_discounts().filter(products=product).distinct(),
+                current_price,
+            )
+            if product_discount:
+                return product_discount, "product"
+
+        variant_discount = cls._pick_best_discount(
+            cls._active_discounts().filter(variants=variant).distinct(),
+            current_price,
+        )
+        if variant_discount:
+            return variant_discount, "variant"
+
+        return None
+
+    @classmethod
+    def _resolve_discount_for_product(cls, product: Product) -> tuple[Discount, str] | None:
+        """
+        Resolve one discount for Product with strict precedence:
+        category > product.
+        """
+        current_price = product.base_price or Decimal("0.00")
 
         category_ids = cls._category_ancestor_ids(product.category)
         if category_ids:
             category_discount = cls._pick_best_discount(
                 cls._active_discounts().filter(categories__in=category_ids).distinct(),
-                effective_price,
+                current_price,
             )
             if category_discount:
                 return category_discount, "category"
 
         product_discount = cls._pick_best_discount(
             cls._active_discounts().filter(products=product).distinct(),
-            effective_price,
+            current_price,
         )
         if product_discount:
             return product_discount, "product"
 
-        variant_discount = cls._pick_best_discount(
-            cls._active_discounts().filter(variants=variant).distinct(),
-            effective_price,
-        )
-        if variant_discount:
-            return variant_discount, "variant"
-
         return None
+
+    @classmethod
+    def _resolve_discount_for_category(cls, category: Category) -> tuple[Discount, str] | None:
+        """
+        Resolve one discount for Category. Since categories only support percentage,
+        we use a dummy price of 100 to compare percentages easily.
+        """
+        category_ids = cls._category_ancestor_ids(category)
+        if category_ids:
+            category_discount = cls._pick_best_discount(
+                cls._active_discounts().filter(categories__in=category_ids).distinct(),
+                Decimal("100.00"),
+            )
+            if category_discount:
+                return category_discount, "category"
+        return None
+
 
     @staticmethod
     def _category_ancestor_ids(category: Category | None) -> list[str]:
@@ -147,7 +203,7 @@ class FinalPricingService:
         normalized_base = base_price.quantize(TWO_DP, rounding=ROUND_HALF_UP)
         if discount is None:
             return PricingResult(
-                original_price=normalized_base,
+                base_price=normalized_base,
                 final_price=normalized_base,
                 discount_amount=Decimal("0.00"),
                 has_discount=False,
@@ -170,7 +226,7 @@ class FinalPricingService:
         )
 
         return PricingResult(
-            original_price=normalized_base,
+            base_price=normalized_base,
             final_price=final_price,
             discount_amount=amount,
             has_discount=True,

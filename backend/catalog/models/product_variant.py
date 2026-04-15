@@ -34,12 +34,12 @@ class ProductVariant(models.Model):
         help_text="Variant label, e.g. 'Size L - Red'.",
     )
 
-    price = models.DecimalField(
+    base_price = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Variant-specific price. If null, falls back to product base_price.",
+        help_text="Variant-specific base price. If null, inherits from product base_price.",
     )
 
     stock_quantity = models.PositiveIntegerField(
@@ -69,13 +69,13 @@ class ProductVariant(models.Model):
         return f"{self.product.name} - {self.name}"
 
     def clean(self):
-        if self.price is not None and self.price < 0:
-            raise ValidationError({"price": "Variant price cannot be negative."})
+        if self.base_price is not None and self.base_price < 0:
+            raise ValidationError({"base_price": "Variant base price cannot be negative."})
 
         self.check_discount_integrity()
 
     def check_discount_integrity(self):
-        eff_price = self.effective_price
+        eff_price = self.base_price if self.base_price is not None else (self.product.base_price if self.product_id else None)
         if eff_price is None:
             return
 
@@ -104,8 +104,8 @@ class ProductVariant(models.Model):
         if max_discount and eff_price < max_discount:
             raise ValidationError(
                 {
-                    "price": (
-                        f"Effective price (${eff_price}) cannot be lower than the fixed "
+                    "base_price": (
+                        f"Effective base price (${eff_price}) cannot be lower than the fixed "
                         f"discount (${max_discount}) applied to this variant or its parent product."
                     )
                 }
@@ -115,6 +115,9 @@ class ProductVariant(models.Model):
         # Ensure SKU is auto-generated for admin/direct model saves too.
         if not self.sku:
             self.sku = self._generate_sku()
+
+        if self.base_price is None and self.product_id:
+            self.base_price = self.product.base_price
 
         self.full_clean()
 
@@ -143,10 +146,6 @@ class ProductVariant(models.Model):
     @property
     def in_stock(self) -> bool:
         return self.stock_quantity > 0
-
-    @property
-    def effective_price(self) -> Decimal:
-        return self.price if self.price is not None else self.product.base_price
 
     def _generate_sku(self) -> str:
         """

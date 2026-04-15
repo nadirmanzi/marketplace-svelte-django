@@ -22,7 +22,7 @@ from .models import (
     VariantAttributeValue,
     Discount,
 )
-from .forms import CategoryAdminForm
+from .forms import CategoryAdminForm, DiscountAdminForm
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 0
     readonly_fields = ("variant_id", "created_at", "updated_at")
-    fields = ("variant_id", "sku", "name", "price", "stock_quantity", "is_active", "metadata")
+    fields = ("variant_id", "sku", "name", "base_price", "stock_quantity", "is_active", "metadata")
 
 
 class ProductAttributeValueInline(admin.TabularInline):
@@ -105,7 +105,7 @@ class VariantAttributeValueInline(admin.TabularInline):
 class ProductAdmin(SimpleHistoryAdmin):
     """Admin interface for Product with inline variants."""
 
-    list_display = ("name", "slug", "status", "base_price", "user", "category", "created_at")
+    list_display = ("name", "slug", "status", "base_price", "user__full_name", "category", "created_at")
     list_filter = ("status", "category")
     search_fields = ("name", "slug", "description")
     prepopulated_fields = {"slug": ("name",)}
@@ -136,7 +136,7 @@ class ProductAdmin(SimpleHistoryAdmin):
 class ProductVariantAdmin(SimpleHistoryAdmin):
     """Standalone admin for ProductVariant with history tracking."""
 
-    list_display = ("sku", "name", "product", "price", "stock_quantity", "is_active", "created_at")
+    list_display = ("sku", "name", "product", "base_price", "stock_quantity", "is_active", "created_at")
     list_filter = ("is_active", "product")
     search_fields = ("sku", "name")
     ordering = ("name",)
@@ -146,7 +146,7 @@ class ProductVariantAdmin(SimpleHistoryAdmin):
 
     fieldsets = (
         (None, {"fields": ("variant_id", "product", "sku", "name")}),
-        ("Pricing & Stock", {"fields": ("price", "stock_quantity")}),
+        ("Pricing & Stock", {"fields": ("base_price", "stock_quantity")}),
         ("Attributes", {"fields": ("metadata",)}),
         ("Status", {"fields": ("is_active",)}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
@@ -184,6 +184,8 @@ class AttributeAdmin(SimpleHistoryAdmin):
 @admin.register(Discount)
 class DiscountAdmin(SimpleHistoryAdmin):
     """Admin interface for discount configuration and lifecycle controls."""
+
+    form = DiscountAdminForm
 
     list_display = (
         "name",

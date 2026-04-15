@@ -10,6 +10,8 @@ Features:
 
 from decimal import Decimal
 from rest_framework import serializers
+
+from catalog.services.pricing_service import FinalPricingService
 from .models import (
     Category,
     Product,
@@ -142,6 +144,7 @@ class CategorySerializer(serializers.ModelSerializer):
     is_root = serializers.BooleanField(read_only=True)
     depth = serializers.IntegerField(read_only=True)
     subcategory_count = serializers.SerializerMethodField()
+    discount = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
@@ -156,6 +159,7 @@ class CategorySerializer(serializers.ModelSerializer):
             "is_root",
             "depth",
             "subcategory_count",
+            "discount",
             "created_at",
             "updated_at",
         ]
@@ -166,11 +170,24 @@ class CategorySerializer(serializers.ModelSerializer):
             return len([c for c in obj.subcategories.all() if c.is_active])
         return obj.subcategories.filter(is_active=True).count()
 
+    def get_discount(self, obj):
+        res = FinalPricingService.get_category_discount(category=obj)
+        if res.has_discount:
+            return {
+                "discount_id": res.applied_discount_id,
+                "name": res.applied_discount_name,
+                "type": res.applied_discount_type,
+                "value": res.applied_discount_value,
+                "scope": res.applied_scope,
+            }
+        return None
+
 
 class CategoryTreeSerializer(serializers.ModelSerializer):
     """Recursive nested representation for the full category tree."""
 
     children = serializers.SerializerMethodField()
+    discount = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
@@ -181,6 +198,7 @@ class CategoryTreeSerializer(serializers.ModelSerializer):
             "description",
             "image",
             "is_active",
+            "discount",
             "children",
         ]
         read_only_fields = fields
@@ -188,6 +206,18 @@ class CategoryTreeSerializer(serializers.ModelSerializer):
     def get_children(self, obj):
         children = obj.subcategories.filter(is_active=True).order_by("name")
         return CategoryTreeSerializer(children, many=True, context=self.context).data
+
+    def get_discount(self, obj):
+        res = FinalPricingService.get_category_discount(category=obj)
+        if res.has_discount:
+            return {
+                "discount_id": res.applied_discount_id,
+                "name": res.applied_discount_name,
+                "type": res.applied_discount_type,
+                "value": res.applied_discount_value,
+                "scope": res.applied_scope,
+            }
+        return None
 
 
 class CategoryWriteSerializer(serializers.Serializer):
@@ -223,9 +253,9 @@ class ProductVariantSummarySerializer(serializers.ModelSerializer):
     """Compact variant representation with fallbacks and attributes."""
 
     in_stock = serializers.BooleanField(read_only=True)
-    price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, source="effective_price", read_only=True
-    )
+    base_price = serializers.SerializerMethodField()
+    final_price = serializers.SerializerMethodField()
+    discount = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
     attributes = AttributeValueSerializer(source="attribute_values", many=True, read_only=True)
 
@@ -235,15 +265,40 @@ class ProductVariantSummarySerializer(serializers.ModelSerializer):
             "variant_id",
             "sku",
             "name",
-            "price",
+            "base_price",
+            "final_price",
             "stock_quantity",
             "metadata",
             "is_active",
             "in_stock",
             "images",
             "attributes",
+            "discount",
         ]
         read_only_fields = fields
+
+    def _get_pricing(self, obj):
+        if not hasattr(obj, "_cached_pricing"):
+            obj._cached_pricing = FinalPricingService.get_variant_pricing(variant=obj)
+        return obj._cached_pricing
+
+    def get_base_price(self, obj):
+        return self._get_pricing(obj).base_price
+
+    def get_final_price(self, obj):
+        return self._get_pricing(obj).final_price
+
+    def get_discount(self, obj):
+        res = self._get_pricing(obj)
+        if res.has_discount:
+            return {
+                "discount_id": res.applied_discount_id,
+                "name": res.applied_discount_name,
+                "type": res.applied_discount_type,
+                "value": res.applied_discount_value,
+                "scope": res.applied_scope,
+            }
+        return None
 
     def get_images(self, obj):
         """Fallback to product images if variant has none."""
@@ -263,6 +318,10 @@ class ProductSerializer(serializers.ModelSerializer):
     is_published = serializers.BooleanField(read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     attributes = AttributeValueSerializer(source="attribute_values", many=True, read_only=True)
+    
+    base_price = serializers.SerializerMethodField()
+    final_price = serializers.SerializerMethodField()
+    discount = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -272,6 +331,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "base_price",
+            "final_price",
             "status",
             "is_published",
             "category_id",
@@ -280,10 +340,34 @@ class ProductSerializer(serializers.ModelSerializer):
             "active_variant_count",
             "images",
             "attributes",
+            "discount",
             "created_at",
             "updated_at",
         ]
         read_only_fields = fields
+
+    def _get_pricing(self, obj):
+        if not hasattr(obj, "_cached_pricing"):
+            obj._cached_pricing = FinalPricingService.get_product_pricing(product=obj)
+        return obj._cached_pricing
+
+    def get_base_price(self, obj):
+        return self._get_pricing(obj).base_price
+
+    def get_final_price(self, obj):
+        return self._get_pricing(obj).final_price
+
+    def get_discount(self, obj):
+        res = self._get_pricing(obj)
+        if res.has_discount:
+            return {
+                "discount_id": res.applied_discount_id,
+                "name": res.applied_discount_name,
+                "type": res.applied_discount_type,
+                "value": res.applied_discount_value,
+                "scope": res.applied_scope,
+            }
+        return None
 
 
 class ProductDetailSerializer(ProductSerializer):
@@ -334,9 +418,11 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     product_id = serializers.UUIDField(source="product.product_id", read_only=True)
     in_stock = serializers.BooleanField(read_only=True)
-    price = serializers.DecimalField(
-        max_digits=12, decimal_places=2, source="effective_price", read_only=True
-    )
+    
+    base_price = serializers.SerializerMethodField()
+    final_price = serializers.SerializerMethodField()
+    discount = serializers.SerializerMethodField()
+    
     images = serializers.SerializerMethodField()
     attributes = AttributeValueSerializer(source="attribute_values", many=True, read_only=True)
 
@@ -348,17 +434,42 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             "product_name",
             "sku",
             "name",
-            "price",
+            "base_price",
+            "final_price",
             "stock_quantity",
             "metadata",
             "is_active",
             "in_stock",
             "images",
             "attributes",
+            "discount",
             "created_at",
             "updated_at",
         ]
         read_only_fields = fields
+
+    def _get_pricing(self, obj):
+        if not hasattr(obj, "_cached_pricing"):
+            obj._cached_pricing = FinalPricingService.get_variant_pricing(variant=obj)
+        return obj._cached_pricing
+
+    def get_base_price(self, obj):
+        return self._get_pricing(obj).base_price
+
+    def get_final_price(self, obj):
+        return self._get_pricing(obj).final_price
+
+    def get_discount(self, obj):
+        res = self._get_pricing(obj)
+        if res.has_discount:
+            return {
+                "discount_id": res.applied_discount_id,
+                "name": res.applied_discount_name,
+                "type": res.applied_discount_type,
+                "value": res.applied_discount_value,
+                "scope": res.applied_scope,
+            }
+        return None
 
     def get_images(self, obj):
         images = obj.images.all()
@@ -373,7 +484,7 @@ class ProductVariantWriteSerializer(serializers.Serializer):
     product = serializers.UUIDField(required=False)
     sku = serializers.CharField(max_length=100, required=False, allow_blank=True)
     name = serializers.CharField(max_length=255)
-    price = PriceField(required=False, allow_null=True)
+    base_price = PriceField(required=False, allow_null=True)
     stock_quantity = serializers.IntegerField(required=False, default=0, min_value=0)
     metadata = serializers.JSONField(required=False, default=dict)
     is_active = serializers.BooleanField(required=False, default=True)
