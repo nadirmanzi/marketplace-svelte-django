@@ -84,18 +84,24 @@ class Product(models.Model):
 
         from .discount import Discount
 
+        # During admin add flows, Product can be unsaved while inline forms validate.
+        # Avoid related-instance filters on unsaved objects.
+        if not self.pk:
+            return
+
         max_discount = (
-            Discount.objects.get_queryset().active()
-            .filter(models.Q(products=self))
-            .filter(discount_type=Discount.DiscountType.FIXED_AMOUNT)
-            .aggregate(models.Max("value"))["value__max"]
+            Discount.objects.filter(
+                products__pk=self.pk,
+                is_active_override=False,
+                discount_type=Discount.DiscountType.FIXED_AMOUNT,
+            ).aggregate(models.Max("value"))["value__max"]
         )
 
         if max_discount and self.base_price < max_discount:
             raise ValidationError(
                 {
                     "base_price": (
-                        f"Price ({self.base_price}) cannot be lower than the active fixed "
+                        f"Price ({self.base_price}) cannot be lower than the fixed "
                         f"discount (${max_discount}) applied directly to this product."
                     )
                 }

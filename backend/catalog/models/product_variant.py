@@ -79,9 +79,22 @@ class ProductVariant(models.Model):
 
         from .discount import Discount
 
+        discount_filter = models.Q()
+        has_scope = False
+
+        # Safe on unsaved inline variants: use ids, not model instances.
+        if self.pk:
+            discount_filter |= models.Q(variants__pk=self.pk)
+            has_scope = True
+        if self.product_id:
+            discount_filter |= models.Q(products__pk=self.product_id)
+            has_scope = True
+
+        if not has_scope:
+            return
+
         max_discount = (
-            Discount.objects.get_queryset().active()
-            .filter(models.Q(variants=self) | models.Q(products=self.product))
+            Discount.objects.filter(discount_filter, is_active_override=False)
             .filter(discount_type=Discount.DiscountType.FIXED_AMOUNT)
             .aggregate(models.Max("value"))["value__max"]
         )
@@ -90,7 +103,7 @@ class ProductVariant(models.Model):
             raise ValidationError(
                 {
                     "price": (
-                        f"Effective price (${eff_price}) cannot be lower than the active fixed "
+                        f"Effective price (${eff_price}) cannot be lower than the fixed "
                         f"discount (${max_discount}) applied to this variant or its parent product."
                     )
                 }
