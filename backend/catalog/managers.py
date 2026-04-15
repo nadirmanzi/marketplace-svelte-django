@@ -8,6 +8,7 @@ Provides filtered querysets for common access patterns:
 """
 
 from django.db import models
+from django.utils import timezone
 
 
 class CategoryQuerySet(models.QuerySet):
@@ -123,4 +124,39 @@ class ProductVariantManager(models.Manager):
     def active_in_stock(self):
         """Convenience: active variants that are in stock."""
         return self.get_queryset().active().in_stock()
+
+
+# ---------------------------------------------------------------------------
+# Discount Manager
+# ---------------------------------------------------------------------------
+
+
+class DiscountQuerySet(models.QuerySet):
+    """Chainable queryset methods for Discount."""
+
+    def active(self):
+        """
+        Return only active discounts.
+        A discount is active if:
+        1. is_active_override is False
+        2. start_date is in the past
+        3. end_date is null OR in the future
+        """
+        now = timezone.now()
+        return self.filter(
+            is_active_override=False,
+            start_date__lte=now,
+        ).filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gte=now)
+        )
+
+
+class DiscountManager(models.Manager):
+    """Default manager for Discount."""
+
+    def get_queryset(self):
+        return DiscountQuerySet(self.model, using=self._db)
+
+    def active_discounts(self):
+        return self.get_queryset().active()
 

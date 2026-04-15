@@ -14,13 +14,14 @@ import uuid
 from decimal import Decimal
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 from django.core.exceptions import ValidationError
 from simple_history.models import HistoricalRecords
 from imagekit.models import ImageSpecField, ProcessedImageField
 from imagekit.processors import ResizeToFill
 
-from .managers import CategoryManager, ProductManager, ProductVariantManager
+from .managers import CategoryManager, ProductManager, ProductVariantManager, DiscountManager
 
 
 class Category(models.Model):
@@ -568,3 +569,116 @@ class VariantAttributeValue(models.Model):
 
     def __str__(self):
         return f"{self.variant.sku} [{self.attribute.name}]"
+
+
+# ---------------------------------------------------------------------------
+# Discounts
+# ---------------------------------------------------------------------------
+
+
+class Discount(models.Model):
+    """
+    Discount rules applicable to categories, products, or variants.
+
+    Discounts can be either a percentage off or a fixed amount.
+    They are active if within their date range and not manually disabled.
+    Hierarchy overrides (Category > Product > Variant) are handled by the pricing service.
+    """
+
+    class DiscountType(models.TextChoices):
+        PERCENTAGE = "percentage", "Percentage"
+        FIXED_AMOUNT = "fixed_amount", "Fixed Amount"
+
+    # Identity
+    discount_id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False
+    )
+    name = models.CharField(max_length=255, help_text="Internal name for the discount, e.g., 'Summer Sale'")
+    description = models.TextField(blank=True, default="", help_text="Optional description for customers.")
+    
+    # Configuration
+    discount_type = models.CharField(
+        max_length=20,
+        choices=DiscountType.choices,
+        default=DiscountType.PERCENTAGE,
+    )
+    value = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        help_text="The value of the discount (e.g., 10 for 10% or $10).",
+    )
+
+    # Validity Period
+    start_date = models.DateTimeField(db_index=True)
+    end_date = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Optional end date. If blank, discount runs indefinitely.",
+    )
+
+    # Manual Control Override
+    is_active_override = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Manual kill-switch. If true, the discount is stopped regardless of dates.",
+    )
+
+    # Relationships
+    categories = models.ManyToManyField(
+        Category, related_name="discounts", blank=True
+    )
+    products = models.ManyToManyField(
+        Product, related_name="discounts", blank=True
+    )
+    variants = models.ManyToManyField(
+        ProductVariant, related_name="discounts", blank=True
+    )
+
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # History tracking
+    history = HistoricalRecords()
+
+    # Custom manager
+    objects = DiscountManager()
+
+    class Meta:
+        verbose_name = "Discount"
+        verbose_name_plural = "Discounts"
+        ordering = ["-start_date"]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_discount_type_display()} - {self.value})"
+
+    def clean(self):
+        """Validate discount constraints."""
+        if self.value <= 0:
+            raise ValidationError({"value": "Discount value must be greater than zero."})
+
+        if self.discount_type == self.DiscountType.PERCENTAGE and self.value > 100:
+            raise ValidationError({"value": "Percentage discounts cannot exceed 100%."})
+
+        if self.end_date and self.start_date and self.end_date <= self.start_date:
+            raise ValidationError({"end_date": "End date must be after the start date."})
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def is_active(self) -> bool:
+        """Dynamically check if this discount is currently active."""
+        if self.is_active_override:
+            return False
+            
+        now = timezone.now()
+        if self.start_date > now:
+            return False
+            
+        if self.end_date and self.end_date < now:
+            return False
+            
+        return True
