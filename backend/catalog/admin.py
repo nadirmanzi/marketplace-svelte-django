@@ -6,6 +6,7 @@ tracking, custom forms, and inline variant editing.
 """
 
 from django.contrib import admin
+from django.utils.safestring import mark_safe
 from simple_history.admin import SimpleHistoryAdmin
 from imagekit.admin import AdminThumbnail
 
@@ -19,6 +20,7 @@ from .models import (
     CategoryAttribute,
     ProductAttributeValue,
     VariantAttributeValue,
+    Discount,
 )
 from .forms import CategoryAdminForm
 
@@ -32,7 +34,7 @@ class CategoryAttributeInline(admin.TabularInline):
     """Inline for assigning attributes to categories."""
 
     model = CategoryAttribute
-    extra = 1
+    extra = 0
     raw_id_fields = ("attribute",)
 
 
@@ -67,7 +69,7 @@ class ProductImageInline(admin.TabularInline):
     """Inline editor for the product/variant image gallery."""
 
     model = ProductImage
-    extra = 1
+    extra = 0
     fields = ("image", "admin_thumbnail", "alt_text", "is_feature", "order", "variant")
     readonly_fields = ("admin_thumbnail",)
 
@@ -87,7 +89,7 @@ class ProductAttributeValueInline(admin.TabularInline):
     """Inline for viewing/editing structured attribute values for products."""
 
     model = ProductAttributeValue
-    extra = 1
+    extra = 0
     raw_id_fields = ("attribute",)
 
 
@@ -95,7 +97,7 @@ class VariantAttributeValueInline(admin.TabularInline):
     """Inline for viewing/editing structured attribute values for variants."""
 
     model = VariantAttributeValue
-    extra = 1
+    extra = 0
     raw_id_fields = ("attribute",)
 
 
@@ -160,7 +162,7 @@ class AttributeOptionInline(admin.TabularInline):
     """Inline editor for attribute choices."""
 
     model = AttributeOption
-    extra = 3
+    extra = 0
 
 
 @admin.register(Attribute)
@@ -172,3 +174,88 @@ class AttributeAdmin(SimpleHistoryAdmin):
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
     inlines = [AttributeOptionInline]
+
+
+# ---------------------------------------------------------------------------
+# Discount Admin
+# ---------------------------------------------------------------------------
+
+
+@admin.register(Discount)
+class DiscountAdmin(SimpleHistoryAdmin):
+    """Admin interface for discount configuration and lifecycle controls."""
+
+    list_display = (
+        "name",
+        "discount_type_badge",
+        "value",
+        "scope_summary",
+        "status_badge",
+        "start_date",
+        "end_date",
+    )
+    list_filter = ()
+    search_fields = ("name", "description", "discount_id")
+    ordering = ("-start_date",)
+    readonly_fields = ("discount_id", "created_at", "updated_at")
+    filter_horizontal = ("categories", "products", "variants")
+    actions = ("invalidate_selected_discounts",)
+
+    fieldsets = (
+        (None, {"fields": ("discount_id", "name", "description")}),
+        ("Configuration", {"fields": ("discount_type", "value")}),
+        ("Scope", {"fields": ("categories", "products", "variants")}),
+        ("Schedule", {"fields": ("start_date", "end_date")}),
+        ("Status", {"fields": ("is_active_override",)}),
+        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+    )
+
+    def discount_type_badge(self, obj):
+        if obj.discount_type == obj.DiscountType.PERCENTAGE:
+            return mark_safe(
+                '<span style="background-color: #2980b9; color: white; padding: 2px 8px; '
+                'border-radius: 10px; font-size: 10px; font-weight: bold;">PERCENT</span>'
+            )
+        return mark_safe(
+            '<span style="background-color: #8e44ad; color: white; padding: 2px 8px; '
+            'border-radius: 10px; font-size: 10px; font-weight: bold;">FIXED</span>'
+        )
+
+    def status_badge(self, obj):
+        if obj.is_active_override:
+            return mark_safe(
+                '<span style="background-color: #c0392b; color: white; padding: 2px 8px; '
+                'border-radius: 10px; font-size: 10px; font-weight: bold;">INVALIDATED</span>'
+            )
+        if obj.is_active:
+            return mark_safe(
+                '<span style="background-color: #27ae60; color: white; padding: 2px 8px; '
+                'border-radius: 10px; font-size: 10px; font-weight: bold;">ACTIVE</span>'
+            )
+        return mark_safe(
+            '<span style="background-color: #7f8c8d; color: white; padding: 2px 8px; '
+            'border-radius: 10px; font-size: 10px; font-weight: bold;">SCHEDULED/EXPIRED</span>'
+        )
+
+    def scope_summary(self, obj):
+        categories_count = obj.categories.count()
+        products_count = obj.products.count()
+        variants_count = obj.variants.count()
+        return f"C:{categories_count} P:{products_count} V:{variants_count}"
+
+    discount_type_badge.short_description = "Type"
+    status_badge.short_description = "Status"
+    scope_summary.short_description = "Scopes"
+
+    @admin.action(description="Invalidate selected discounts (kill-switch ON)")
+    def invalidate_selected_discounts(self, request, queryset):
+        updated = queryset.filter(is_active_override=False).update(is_active_override=True)
+        already_invalidated = queryset.count() - updated
+
+        if already_invalidated:
+            self.message_user(
+                request,
+                f"Invalidated {updated} discount(s). {already_invalidated} were already invalidated.",
+            )
+        else:
+            self.message_user(request, f"Invalidated {updated} discount(s).")
