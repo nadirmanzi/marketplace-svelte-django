@@ -9,7 +9,32 @@ accidentally creating broken category hierarchies.
 from django import forms
 from django.core.exceptions import ValidationError
 
-from .models import Category
+from .models import Category, Discount
+
+
+class DiscountAdminForm(forms.ModelForm):
+    """
+    ModelForm for Discount validating M2M fields seamlessly in the Django admin.
+    """
+
+    class Meta:
+        model = Discount
+        fields = "__all__"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        discount_type = cleaned_data.get("discount_type")
+        categories = cleaned_data.get("categories")
+
+        if discount_type == Discount.DiscountType.FIXED_AMOUNT and categories:
+            self.add_error(
+                "discount_type",
+                ValidationError(
+                    "Fixed amount discounts cannot be applied to categories. "
+                    "Category-wide discounts must use the percentage type."
+                ),
+            )
+        return cleaned_data
 
 
 class CategoryAdminForm(forms.ModelForm):

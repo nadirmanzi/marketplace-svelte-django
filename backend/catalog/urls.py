@@ -26,6 +26,7 @@ from catalog.views.attribute_views import (
     AttributeViewSet,
     CategoryAttributeInfoView,
 )
+from catalog.views.discount_views import DiscountManagementViewSet
 
 router = DefaultRouter()
 
@@ -42,6 +43,9 @@ router.register(r"variants/manage", VariantManagementViewSet, basename="variant-
 
 # Attributes
 router.register(r"attributes/manage", AttributeViewSet, basename="attribute-manage")
+
+# Discounts
+router.register(r"discounts/manage", DiscountManagementViewSet, basename="discount-manage")
 
 urlpatterns = [
     path("categories/<uuid:category_id>/attributes/", CategoryAttributeInfoView.as_view(), name="category-attributes"),
