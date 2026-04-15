@@ -1,5 +1,6 @@
 import uuid
 
+from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -86,13 +87,34 @@ class Discount(models.Model):
                 )
 
         if self.discount_type == self.DiscountType.FIXED_AMOUNT and self.pk:
+            product_ids = self.products.values_list("pk", flat=True)
             min_product_price = self.products.aggregate(models.Min("base_price"))["base_price__min"]
-            if min_product_price and self.value > min_product_price:
+
+            ProductVariant = apps.get_model("catalog", "ProductVariant")
+            min_child_variant_price = (
+                ProductVariant.objects.filter(product_id__in=product_ids)
+                .annotate(
+                    eff_price=models.Case(
+                        models.When(price__isnull=False, then="price"),
+                        default="product__base_price",
+                        output_field=models.DecimalField(),
+                    )
+                )
+                .aggregate(models.Min("eff_price"))["eff_price__min"]
+            )
+
+            min_product_scope_price = min_product_price
+            if min_product_scope_price is None:
+                min_product_scope_price = min_child_variant_price
+            elif min_child_variant_price is not None:
+                min_product_scope_price = min(min_product_scope_price, min_child_variant_price)
+
+            if min_product_scope_price and self.value > min_product_scope_price:
                 raise ValidationError(
                     {
                         "value": (
                             f"Fixed discount ({self.value}) cannot exceed the base price "
-                            f"of an associated product ({min_product_price})."
+                            f"of an associated product/variant ({min_product_scope_price})."
                         )
                     }
                 )

@@ -85,7 +85,7 @@ class Product(models.Model):
         from .discount import Discount
 
         max_discount = (
-            Discount.objects.active()
+            Discount.objects.get_queryset().active()
             .filter(models.Q(products=self))
             .filter(discount_type=Discount.DiscountType.FIXED_AMOUNT)
             .aggregate(models.Max("value"))["value__max"]

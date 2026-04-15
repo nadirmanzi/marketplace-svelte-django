@@ -80,7 +80,7 @@ class ProductVariant(models.Model):
         from .discount import Discount
 
         max_discount = (
-            Discount.objects.active()
+            Discount.objects.get_queryset().active()
             .filter(models.Q(variants=self) | models.Q(products=self.product))
             .filter(discount_type=Discount.DiscountType.FIXED_AMOUNT)
             .aggregate(models.Max("value"))["value__max"]
