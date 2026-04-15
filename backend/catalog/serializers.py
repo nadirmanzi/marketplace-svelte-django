@@ -14,6 +14,7 @@ from .models import (
     Category,
     Product,
     ProductVariant,
+    Discount,
     ProductImage,
     Attribute,
     AttributeOption,
@@ -394,3 +395,92 @@ class StockAdjustmentSerializer(serializers.Serializer):
         if value == 0:
             raise serializers.ValidationError("Stock adjustment delta cannot be zero.")
         return value
+
+
+# ---------------------------------------------------------------------------
+# Discount Serializers
+# ---------------------------------------------------------------------------
+
+
+class DiscountSerializer(serializers.ModelSerializer):
+    """Read representation for discount resources."""
+
+    categories = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    products = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    variants = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Discount
+        fields = [
+            "discount_id",
+            "name",
+            "description",
+            "discount_type",
+            "value",
+            "start_date",
+            "end_date",
+            "is_active_override",
+            "is_active",
+            "categories",
+            "products",
+            "variants",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
+class DiscountWriteSerializer(serializers.Serializer):
+    """Input serializer for creating and updating discounts."""
+
+    name = serializers.CharField(max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    discount_type = serializers.ChoiceField(choices=Discount.DiscountType.choices)
+    value = PriceField()
+    start_date = serializers.DateTimeField()
+    end_date = serializers.DateTimeField(required=False, allow_null=True)
+    is_active_override = serializers.BooleanField(required=False, default=False)
+    categories = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+    )
+    products = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+    )
+    variants = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+    )
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Discount name cannot be blank.")
+        return value
+
+    def validate(self, attrs):
+        start = attrs.get("start_date")
+        end = attrs.get("end_date")
+        discount_type = attrs.get("discount_type")
+        categories = attrs.get("categories", [])
+        value = attrs.get("value")
+
+        if end is not None and start is not None and end <= start:
+            raise serializers.ValidationError({"end_date": "End date must be after start date."})
+
+        if discount_type == Discount.DiscountType.PERCENTAGE and value > 100:
+            raise serializers.ValidationError(
+                {"value": "Percentage discounts cannot exceed 100%."}
+            )
+
+        if categories and discount_type == Discount.DiscountType.FIXED_AMOUNT:
+            raise serializers.ValidationError(
+                {"discount_type": "Category discounts must be percentage based."}
+            )
+
+        return attrs
