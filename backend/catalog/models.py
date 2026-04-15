@@ -220,10 +220,34 @@ class Product(models.Model):
         return self.name
 
     def clean(self):
-        """Validate price is positive."""
+        """Validate price constraints."""
         if self.base_price is not None and self.base_price < 0:
             raise ValidationError(
                 {"base_price": "Base price cannot be negative."}
+            )
+        
+        # Guard: Ensure price isn't lower than active fixed discounts
+        self.check_discount_integrity()
+
+    def check_discount_integrity(self):
+        """
+        Guard Method: Ensures base_price is not lower than any active fixed-amount discount.
+        Checks both direct product discounts and category-wide discounts.
+        """
+        if self.base_price is None:
+            return
+
+        from .models import Discount
+        
+        max_discount = Discount.objects.active().filter(
+            models.Q(products=self)
+        ).filter(
+            discount_type=Discount.DiscountType.FIXED_AMOUNT
+        ).aggregate(models.Max('value'))['value__max']
+
+        if max_discount and self.base_price < max_discount:
+            raise ValidationError(
+                {"base_price": f"Price ({self.base_price}) cannot be lower than the active fixed discount (${max_discount}) applied directly to this product."}
             )
 
     def save(self, *args, **kwargs):
@@ -332,10 +356,37 @@ class ProductVariant(models.Model):
         return f"{self.product.name} — {self.name}"
 
     def clean(self):
-        """Validate price is positive."""
+        """Validate price constraints."""
         if self.price is not None and self.price < 0:
             raise ValidationError(
                 {"price": "Variant price cannot be negative."}
+            )
+        
+        # Guard: Ensure effective price isn't lower than active fixed discounts
+        self.check_discount_integrity()
+
+    def check_discount_integrity(self):
+        """
+        Guard Method: Ensures effective_price is not lower than any active fixed-amount discount.
+        Checks variant, product, and category-level discounts.
+        """
+        eff_price = self.effective_price
+        if eff_price is None:
+            return
+
+        from .models import Discount
+        
+        # Check discounts applied to this variant or its parent product
+        max_discount = Discount.objects.active().filter(
+            models.Q(variants=self) | 
+            models.Q(products=self.product)
+        ).filter(
+            discount_type=Discount.DiscountType.FIXED_AMOUNT
+        ).aggregate(models.Max('value'))['value__max']
+
+        if max_discount and eff_price < max_discount:
+            raise ValidationError(
+                {"price": f"Effective price (${eff_price}) cannot be lower than the active fixed discount (${max_discount}) applied to this variant or its parent product."}
             )
 
     def save(self, *args, **kwargs):
