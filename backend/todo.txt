@@ -1,1 +1,0 @@
-last admin guard not working. ensure if 1 admin is remaining, is_active is_staff is_superuser are always true and is_soft_deleted always false
