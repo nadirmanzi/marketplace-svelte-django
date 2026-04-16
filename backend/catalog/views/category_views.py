@@ -44,9 +44,9 @@ logger = logging.getLogger(__name__)
 
 @extend_schema_view(
     list=extend_schema(
-        summary="List Category Tree",
-        description="Returns all active root categories with their nested subcategories.",
-        responses={200: CategoryTreeSerializer(many=True)},
+        summary="List Categories (Flat)",
+        description="Returns a flat list of active categories.",
+        responses={200: CategorySerializer(many=True)},
     ),
     retrieve=extend_schema(
         summary="Get Category by Slug",
@@ -60,25 +60,45 @@ class CategoryPublicViewSet(
     viewsets.GenericViewSet,
 ):
     """
-    Public read-only access to the category tree.
+    Public read-only access to categories.
 
-    - list: Returns active root categories with nested children.
+    - list: Returns active categories as a flat list.
+    - tree: Returns active root categories with nested children.
     - retrieve: Returns a single category by slug with its subtree.
     """
 
     permission_classes = [AllowAny]
-    serializer_class = CategoryTreeSerializer
     lookup_field = "slug"
-    pagination_class = None  # Trees are returned un-paginated (small dataset)
+    pagination_class = None
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = CategoryFilter
 
     def get_queryset(self):
-        return (
-            Category.objects
-            .active()
-            .roots()
-            .prefetch_related("subcategories")
-            .order_by("name")
-        )
+        if self.action == "tree":
+            return (
+                Category.objects
+                .active()
+                .roots()
+                .prefetch_related("subcategories")
+                .order_by("name")
+            )
+        return Category.objects.active().select_related("parent").order_by("name")
+
+    def get_serializer_class(self):
+        if self.action in ("tree", "retrieve"):
+            return CategoryTreeSerializer
+        return CategorySerializer
+
+    @extend_schema(
+        summary="List Category Tree",
+        description="Returns all active root categories with their nested subcategories.",
+        responses={200: CategoryTreeSerializer(many=True)},
+    )
+    @action(detail=False, methods=["get"], url_path="tree")
+    def tree(self, request):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
         """Get a single category by slug (must be active)."""
