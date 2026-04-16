@@ -1,7 +1,1 @@
-1. make the models consistent
-if its supposed to be base_price or original price it has to be one throughout the model and services
-do this for everything else that is not syntactically or logically consistent throughout the catalog app
-2. variant price should automatically fallback to parent price if not set without any additional overhead it should be native to the model
-
-logic that should be in the model or abstracted should be put accordingly
-and im talking about the entire backend folder
+last admin guard not working. ensure if 1 admin is remaining, is_active is_staff is_superuser are always true and is_soft_deleted always false

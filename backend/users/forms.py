@@ -148,8 +148,11 @@ class UserCreationForm(forms.ModelForm):
         """
         if not commit:
             # Manually extract ONLY the fields that are NOT Many-to-Many
-            data = {k: v for k, v in self.cleaned_data.items() 
-                    if k not in ['groups', 'user_permissions', 'password1', 'password2']}
+            data = {
+                k: v
+                for k, v in self.cleaned_data.items()
+                if k not in ["groups", "user_permissions", "password1", "password2"]
+            }
             user = User(**data)
             user.set_password(self.cleaned_data.get("password1"))
 
@@ -216,6 +219,7 @@ class UserChangeForm(forms.ModelForm):
             "is_soft_deleted": forms.CheckboxInput(),
         }
 
+
     def clean_email(self):
         """Validate email uniqueness (excluding current user)."""
         email = self.cleaned_data.get("email")
@@ -254,13 +258,22 @@ class UserChangeForm(forms.ModelForm):
     def clean(self):
         """Check verification status consistency and soft-delete logic."""
         cleaned_data = super().clean()
-        telephone_number = cleaned_data.get("telephone_number")
         is_soft_deleted = cleaned_data.get("is_soft_deleted")
 
         # If soft-deleted, should not be active
         if is_soft_deleted and cleaned_data.get("is_active"):
             raise ValidationError(
                 "Soft-deleted users cannot be active. Deactivate the user or restore them."
+            )
+
+        is_last_superuser = cleaned_data.get("is_last_superuser")
+        is_active = cleaned_data.get("is_active")
+        is_staff = cleaned_data.get("is_staff")
+        is_superuser = cleaned_data.get("is_superuser")
+
+        if is_last_superuser and (not is_active or not is_staff or not is_superuser):
+            raise ValidationError(
+                "Cannot deactivate or remove staff, superuser status from the last superuser"
             )
 
         return cleaned_data

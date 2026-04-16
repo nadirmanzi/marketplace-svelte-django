@@ -27,6 +27,7 @@ from django.core.validators import validate_email
 from .managers import UserManager
 from users.utils.validators import normalize_email, validate_and_normalize_phone
 
+
 class User(AbstractBaseUser, PermissionsMixin):
     """
     Custom user model:
@@ -90,7 +91,10 @@ class User(AbstractBaseUser, PermissionsMixin):
             return False
 
         # Count other superusers
-        return type(self).objects.filter(is_superuser=True).exclude(pk=self.pk).count() == 0
+        return (
+            type(self).objects.filter(is_superuser=True).exclude(pk=self.pk).count()
+            == 0
+        )
 
     def rotate_session(self):
         """Increment session_version to invalidate all existing tokens. Does not save."""
@@ -136,6 +140,13 @@ class User(AbstractBaseUser, PermissionsMixin):
                     validate_and_normalize_phone(number)
                 except ValidationError as e:
                     raise ValidationError({field: e.messages[0]})
+
+        # Prevent deactivating superuser
+        if self.is_last_superuser:
+            if not self.is_active or not self.is_staff or not self.is_superuser:
+                raise ValidationError(
+                    "Cannot deactivate or remove is_staff/is_superuser from last superuser"
+                )
 
     def save(self, *args, **kwargs):
         """Normalize fields and enforce soft-delete behavior.
@@ -185,10 +196,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def set_password(self, raw_password):
         """Hash password and update session tracking (does not save).
-        
+
         Args:
             raw_password (str): The plaintext password to hash and store.
-        
+
         Side Effects:
             - Hashes password using Django's password hashing algorithm.
             - Updates password_changed_at to current timestamp.
@@ -196,15 +207,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         """
         # Check if this is a password change vs initial set
         is_password_change = bool(self.password)
-        
+
         # Hash the password
         self.password = make_password(raw_password)
-        
+
         # Always update timestamp (useful for password expiration)
         self.password_changed_at = timezone.now()
-        
+
         # Only increment session version on actual password changes
         # This invalidates existing tokens when password changes
         if is_password_change:
             self.session_version += 1
-

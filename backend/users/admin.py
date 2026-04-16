@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from datetime import timedelta
 from users.models import User
@@ -14,9 +15,10 @@ class UserAdmin(BaseUserAdmin):
     add_form = UserCreationForm
     form = UserChangeForm
     ordering = ["-created_at"]
-    
+
     list_display = [
         "full_name",
+        "is_last_superuser",
         "email",
         "telephone_number",
         "user_role",
@@ -24,7 +26,7 @@ class UserAdmin(BaseUserAdmin):
         "is_soft_deleted_badge",
         "created_at",
     ]
-    
+
     list_filter = [
         # "is_active",
         # "is_staff",
@@ -32,9 +34,9 @@ class UserAdmin(BaseUserAdmin):
         # "is_soft_deleted",
         # "created_at",
     ]
-    
+
     search_fields = ["email", "full_name", "telephone_number", "user_id"]
-    
+
     readonly_fields = [
         "user_id",
         "password_changed_at",
@@ -154,12 +156,18 @@ class UserAdmin(BaseUserAdmin):
 
     def status_badge(self, obj):
         if obj.is_active:
-            return mark_safe('<span style="background-color: #27ae60; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">ACTIVE</span>')
-        return mark_safe('<span style="background-color: #c0392b; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">INACTIVE</span>')
+            return mark_safe(
+                '<span style="background-color: #27ae60; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">ACTIVE</span>'
+            )
+        return mark_safe(
+            '<span style="background-color: #c0392b; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">INACTIVE</span>'
+        )
 
     def is_soft_deleted_badge(self, obj):
         if obj.is_soft_deleted:
-            return mark_safe('<span style="color: #e67e22; font-weight: bold;">🗑 Deleted</span>')
+            return mark_safe(
+                '<span style="color: #e67e22; font-weight: bold;">🗑 Deleted</span>'
+            )
         return mark_safe('<span style="color: #bdc3c7;">-</span>')
 
     status_badge.short_description = "Status"
@@ -171,23 +179,27 @@ class UserAdmin(BaseUserAdmin):
     @admin.action(description="Force selected users to change password")
     def force_password_expiry(self, request, queryset):
         # Set password_changed_at to long ago
-        user_ids = list(queryset.values_list('user_id', flat=True))
-        count = queryset.update(password_changed_at=timezone.now() - timedelta(days=365))
-        
+        user_ids = list(queryset.values_list("user_id", flat=True))
+        count = queryset.update(
+            password_changed_at=timezone.now() - timedelta(days=365)
+        )
+
         for user_id in user_ids:
             audit_log.warning(
                 action="admin.force_password_expiry",
                 message="Password expiry forced by admin",
                 status="success",
                 source="users.admin.UserAdmin",
-                target_user_id=str(user.user_id),
+                target_user_id=str(user_id),
             )
-        
-        self.message_user(request, f"Successfully forced password change for {count} users.")
+
+        self.message_user(
+            request, f"Successfully forced password change for {count} users."
+        )
 
     @admin.action(description="Soft-delete selected users")
     def soft_delete_users(self, request, queryset):
-        # We should use the service or at least ensure is_soft_deleted is True 
+        # We should use the service or at least ensure is_soft_deleted is True
         # so models.save() handles the rest.
         count = 0
         for user in queryset:
