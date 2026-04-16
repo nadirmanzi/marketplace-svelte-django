@@ -161,6 +161,12 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.email:
             self.email = normalize_email(self.email)
 
+        if self.is_superuser:
+            self.is_active=True
+            self.is_staff=True
+            self.is_soft_deleted=False
+            self.soft_deleted_at=None
+
         # Name normalization: strip whitespace from first/last names.
         for field in ["full_name"]:
             value = getattr(self, field)
