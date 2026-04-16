@@ -18,12 +18,12 @@ class UserAdmin(BaseUserAdmin):
 
     list_display = [
         "full_name",
-        "is_last_superuser",
+        # "is_last_superuser",
         "email",
         "telephone_number",
         "user_role",
         "status_badge",
-        "is_soft_deleted_badge",
+        # "is_soft_deleted_badge",
         "created_at",
     ]
 
@@ -159,19 +159,25 @@ class UserAdmin(BaseUserAdmin):
             return mark_safe(
                 '<span style="background-color: #27ae60; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">ACTIVE</span>'
             )
+        
+        elif obj.is_soft_deleted:
+            return mark_safe(
+                '<span style="background-color: #c0392b; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">DELETED</span>'
+            )
+
         return mark_safe(
-            '<span style="background-color: #c0392b; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">INACTIVE</span>'
+            '<span style="background-color: #777777; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold;">INACTIVE</span>'
         )
 
-    def is_soft_deleted_badge(self, obj):
-        if obj.is_soft_deleted:
-            return mark_safe(
-                '<span style="color: #e67e22; font-weight: bold;">🗑 Deleted</span>'
-            )
-        return mark_safe('<span style="color: #bdc3c7;">-</span>')
+    # def is_soft_deleted_badge(self, obj):
+    #     if obj.is_soft_deleted:
+    #         return mark_safe(
+    #             '<span style="color: #e67e22; font-weight: bold;">🗑 Deleted</span>'
+    #         )
+    #     return mark_safe('<span style="color: #bdc3c7;">-</span>')
 
     status_badge.short_description = "Status"
-    is_soft_deleted_badge.short_description = "Soft Deleted"
+    # is_soft_deleted_badge.short_description = "Soft Deleted"
     user_role.short_description = "Role"
 
     # --- Custom Actions ---
