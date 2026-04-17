@@ -143,7 +143,7 @@ class RegisterSerializer(serializers.ModelSerializer):
                 user = User.objects.create_user(**validated_data)
                 return user
         except IntegrityError:
-            raise serializers.ValidationError({"detail": "Could not create user. Database integrity error."})
+            raise serializers.ValidationError("Could not create user. Database integrity error.")
 
 
 # -------------------------

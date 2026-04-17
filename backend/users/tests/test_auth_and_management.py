@@ -103,6 +103,8 @@ class AuthAndManagementTests(TestCase):
         # Passing a string instead of a boolean (in JSON)
         response = self.client.post(url, {"is_staff": "not-a-bool"}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        # Unified error schema: {"success": false, "code": "...", "detail": "...", "errors": {...}}
+        self.assertFalse(response.data["success"])
         self.assertIn("must be a boolean", response.data["detail"])
 
     def test_set_superuser_status(self):
