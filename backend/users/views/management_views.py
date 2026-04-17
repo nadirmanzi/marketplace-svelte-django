@@ -34,6 +34,8 @@ from users.serializers import (
     UpdateUserSerializer,
     StaffUserActionSerializer,
     ReadOnlyUserSerializer,
+    MeSerializer,
+    FullUserSerializer,
     RegisterSerializer,
 )
 from users.utils.permissions import UserActionPermission
@@ -101,13 +103,19 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         Mapping:
         - create -> RegisterSerializer
+        - me -> MeSerializer (non-sensitive profile)
+        - retrieve -> FullUserSerializer (staff/admin only)
         - update/partial_update -> UpdateUserSerializer
         - deactivate/activate/soft_delete -> StaffUserActionSerializer
         - set_staff_status/set_superuser_status/manage_groups/manage_permissions -> AdminUserActionSerializer
-        - all others -> ReadOnlyUserSerializer
+        - list -> ReadOnlyUserSerializer
         """
         if self.action == "create":
             return RegisterSerializer
+        if self.action == "me":
+            return MeSerializer
+        if self.action == "retrieve":
+            return FullUserSerializer
         if self.action in ["update", "partial_update"]:
             return UpdateUserSerializer
         elif self.action in ["deactivate", "activate", "soft_delete"]:
@@ -126,7 +134,8 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         Return permission classes for the current action.
 
         - create: AllowAny (public registration)
-        - me: AllowAny + IsAuthenticated (authenticated users only)
+        - me: IsAuthenticated (authenticated users only)
+        - retrieve: IsAuthenticated + staff/admin required
         - all others: IsAuthenticated + UserActionPermission
         """
         if self.action == "create":
@@ -169,7 +178,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         }
 
         Returns:
-            201: User profile + tokens (tokens attached by post_save signal).
+            201: Empty body. Tokens set via cookies.
             400: Validation errors.
         """
         serializer = self.get_serializer(data=request.data)
@@ -178,10 +187,8 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         # Create user — post_save signal fires and attaches _auth_tokens
         user = serializer.save()
 
-        response_data = ReadOnlyUserSerializer(user).data
-
-        # Tokens are generated during creation; set them as cookies instead of in body
-        response = Response(response_data, status=status.HTTP_201_CREATED)
+        # Tokens are generated during creation; set them as cookies
+        response = Response(status=status.HTTP_201_CREATED)
         if hasattr(user, "_auth_tokens"):
             return set_auth_cookies(
                 response, 
@@ -257,16 +264,16 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @extend_schema(summary="Current User Profile", description="Return the authenticated user's own profile.")
+    @extend_schema(summary="Current User Profile", description="Return the authenticated user's own non-sensitive profile.")
     @action(detail=False, methods=["get"], url_path="me")
     def me(self, request):
         """
-        Return the authenticated user's own profile.
+        Return the authenticated user's own non-sensitive profile.
 
         GET /users/management/me/
 
         Returns:
-            200: Full user profile (ReadOnlyUserSerializer).
+            200: Non-sensitive user profile (MeSerializer).
             401: If user is not authenticated.
         """
         serializer = self.get_serializer(request.user)

@@ -66,10 +66,75 @@ class UserUpdateMixin:
 
 
 # -------------------------
-# Read-only user profile
+# Embedded user (for resources like products)
+# -------------------------
+class EmbeddedUserSerializer(serializers.ModelSerializer):
+    """Minimal user representation embedded in resource responses (e.g. products)."""
+
+    class Meta:
+        model = User
+        fields = ("user_id", "full_name", "email")
+        read_only_fields = fields
+
+
+# -------------------------
+# /me endpoint (non-sensitive)
+# -------------------------
+class MeSerializer(serializers.ModelSerializer):
+    """Non-sensitive user profile for the /me endpoint."""
+
+    password_expires_in_days = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = (
+            "user_id",
+            "email",
+            "full_name",
+            "telephone_number",
+            "password_changed_at",
+            "password_expires_in_days",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+# -------------------------
+# Full user object (staff/admin only, /management/{pk}/)
+# -------------------------
+class FullUserSerializer(serializers.ModelSerializer):
+    """Complete user representation for staff/admin detail views."""
+
+    password_expired = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = (
+            "user_id",
+            "email",
+            "full_name",
+            "telephone_number",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "is_soft_deleted",
+            "soft_deleted_at",
+            "password_changed_at",
+            "password_expires_in_days",
+            "password_expired",
+            "session_version",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
+
+
+# -------------------------
+# Read-only user profile (legacy — used for management action responses with dynamic fields)
 # -------------------------
 class ReadOnlyUserSerializer(serializers.ModelSerializer):
-    """Expose full user profile in read-only mode."""
+    """Expose user profile in read-only mode with optional dynamic field selection."""
 
     def __init__(self, *args, **kwargs):
         fields = kwargs.pop("fields", None)

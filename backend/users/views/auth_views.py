@@ -100,14 +100,6 @@ class LoginView(TokenObtainPairView):
 
         refresh = CustomRefreshToken.for_user(user)
 
-        # Build response payload
-        data = {
-            "user": {
-                "user_id": str(user.user_id),
-                "email": str(user.email),
-            }
-        }
-
         # Check if password has expired AFTER generating tokens but BEFORE logging success
         if hasattr(user, "password_expired") and user.password_expired:
             audit_log.warning(
@@ -119,9 +111,10 @@ class LoginView(TokenObtainPairView):
             )
             response = Response(
                 {
-                    "error": "password_expired",
+                    "success": False,
+                    "code": "password_expired",
                     "detail": "Your password has expired. Please change it to continue.",
-                    "user": data["user"]
+                    "errors": {},
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
@@ -135,17 +128,9 @@ class LoginView(TokenObtainPairView):
             target_user_id=str(user.user_id),
         )
 
-        response = Response(
-            data=data,
-            status=status.HTTP_200_OK,
-        )
+        response = Response(status=status.HTTP_200_OK)
 
-        response = set_auth_cookies(response, str(refresh.access_token), str(refresh))
-
-        print({'access_token': response.cookies.get("access_token")})
-        print({'refresh_token': response.cookies.get("refresh_token")})
-
-        return response
+        return set_auth_cookies(response, str(refresh.access_token), str(refresh))
 
 
 class CustomTokenRefreshView(TokenRefreshView):
@@ -210,11 +195,9 @@ class CustomTokenRefreshView(TokenRefreshView):
         access_token = serializer.validated_data.get("access")
         refresh_token = serializer.validated_data.get("refresh")
         
-        response = Response({"detail": "Token successfully refreshed."}, status=status.HTTP_200_OK)
+        response = Response(status=status.HTTP_200_OK)
 
         response = set_auth_cookies(response, str(access_token), str(refresh_token))
-
-        print(response)
 
         return response
 

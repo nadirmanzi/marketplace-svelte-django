@@ -51,10 +51,10 @@ class UserActionPermission(permissions.BasePermission):
         if view.action == 'list':
             return user.has_perm('users.view_user')
         
-        # For retrieve (detail view), we'll check in has_object_permission
-        # if they're viewing themselves
+        # For retrieve (detail view), restrict to staff/admin only.
+        # Regular users must use the /me endpoint.
         if view.action == 'retrieve':
-            return True  # Will be checked in has_object_permission
+            return user.has_perm('users.view_user')
         
         # For create (registration), typically anyone can create
         # But you might want to restrict this
