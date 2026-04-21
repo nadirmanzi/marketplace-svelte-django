@@ -1,4 +1,29 @@
 /**
+ * Standard API error structure.
+ */
+export interface ApiError {
+    success: false;
+    code: string;
+    detail: string;
+    errors: Record<string, string[]>; // Field-based validation errors
+}
+
+/**
+ * Standard API success structure (optional wrapper, some endpoints return data directly).
+ */
+export interface ApiSuccess<T> {
+    success: true;
+    data: T;
+}
+
+/**
+ * Discriminated union for API return results.
+ */
+export type ApiResult<T> = 
+    | { ok: true; status: number; data: T; error: null; headers: Headers }
+    | { ok: false; status: number; error: ApiError; data: null; headers: Headers | null };
+
+/**
  * Standard User Profile as per Section 6 of the API Guide.
  */
 export interface UserProfile {
@@ -13,48 +38,22 @@ export interface UserProfile {
 }
 
 /**
- * Standard API error structure.
- */
-export interface ApiError {
-    detail?: string;
-    code?: string;
-    user?: TruncatedUser;
-    errors?: Record<string, string[]>; // Field-based validation errors
-    non_field_errors?: string[];
-    messages?: Array<{
-        token_class: string;
-        token_type: string;
-        message: string;
-    }>;
-}
-
-/**
- * Truncated user info returned by standard login.
- */
-export interface TruncatedUser {
-    user_id: string;
-    email: string;
-}
-
-/**
  * Response for POST /users/auth/login/
  */
 export interface LoginResponse {
-    user?: TruncatedUser;
-    error?: 'password_expired';
-    detail?: string;
+    user: {
+        user_id: string;
+        email: string;
+        full_name: string;
+    };
 }
 
 /**
  * Response for POST /users/management/ (Signup)
  */
-export interface SignupResponse {
-    data: UserProfile;
-}
+export type SignupResponse = UserProfile;
 
 /**
  * Response for GET /users/management/me/
  */
-export interface MeResponse {
-    data: UserProfile;
-}
+export type MeResponse = UserProfile;

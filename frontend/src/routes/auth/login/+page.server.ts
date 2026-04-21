@@ -6,7 +6,7 @@ import { login_schema } from "$lib/schemas/auth";
 import { login } from "$lib/server/auth/users/login";
 
 import { redirect } from "@sveltejs/kit";
-import { guardAuth } from "$lib/server/auth/users/session";
+import { guardAuth } from "$lib/server/auth/session";
 
 export const load: PageServerLoad = async ({ url, locals, }) => {
     guardAuth(locals, url);

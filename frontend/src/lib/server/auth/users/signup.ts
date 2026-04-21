@@ -1,5 +1,7 @@
 import { apiFetch } from "$lib/api/client";
-import type { UserProfile } from "$lib/api/types";
+import type { UserProfile, SignupResponse } from "$lib/api/types";
+import type { RequestEvent } from "@sveltejs/kit";
+import { forwardCookies } from "../cookies";
 
 /**
  * Standard Signup Result.
@@ -13,12 +15,6 @@ export interface SignupResult {
 }
 
 /**
- * Creates a new account and automatically logs the user in.
- * Section 3.1 of API Guide.
- */
-import type { RequestEvent } from "@sveltejs/kit";
-
-/**
  * Creates a new account and manually forwards JWT cookies from Django to the Browser.
  */
 export const signup = async (
@@ -29,36 +25,20 @@ export const signup = async (
     event: RequestEvent
 ): Promise<SignupResult> => {
     
-    const { data, error, status, ok, headers } = await apiFetch<UserProfile>('/users/management/', {
+    const res = await apiFetch<SignupResponse>('/users/management/', {
         method: 'POST',
         body: JSON.stringify({ full_name, email, password })
     }, customFetch);
 
     // --- COOKIE FORWARDING LOGIC ---
-    if (ok && headers) {
-        const backendCookies = headers.getSetCookie ? headers.getSetCookie() : [];
-
-        backendCookies.forEach(cookieString => {
-            const [nameValue, ...attributes] = cookieString.split('; ');
-            const [name, value] = nameValue.split('=');
-
-            const isHttpOnly = cookieString.toLowerCase().includes('httponly');
-            const isSecure = cookieString.toLowerCase().includes('secure');
-            const maxAgeMatch = cookieString.match(/Max-Age=(\d+)/i);
-            const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1]) : undefined;
-
-            event.cookies.set(name, value, {
-                path: '/',
-                httpOnly: isHttpOnly,
-                secure: isSecure,
-                sameSite: 'lax',
-                maxAge: maxAge
-            });
-        });
+    if (res.ok && res.headers) {
+        forwardCookies(res.headers, event);
     }
 
-    if (!ok) {
-        if (status === 400 && error?.errors) {
+    if (!res.ok) {
+        const { error, status } = res;
+        
+        if (Object.keys(error.errors).length > 0) {
             return {
                 success: false,
                 status_code: status,
@@ -73,13 +53,13 @@ export const signup = async (
         return {
             success: false,
             status_code: status,
-            error: error?.detail || error?.non_field_errors?.[0] || 'Registration failed.'
+            error: error.detail || 'Registration failed.'
         };
     }
 
     return {
         success: true,
-        status_code: status,
-        user: data || undefined
+        status_code: res.status,
+        user: res.data
     };
 };

@@ -109,11 +109,13 @@ class LoginView(TokenObtainPairView):
                 source="users.views.LoginView",
                 target_user_id=str(user.user_id),
             )
+            from users.serializers import EmbeddedUserSerializer
             response = Response(
                 {
                     "success": False,
                     "code": "password_expired",
                     "detail": "Your password has expired. Please change it to continue.",
+                    "user": EmbeddedUserSerializer(user).data,
                     "errors": {},
                 },
                 status=status.HTTP_403_FORBIDDEN,
@@ -128,7 +130,13 @@ class LoginView(TokenObtainPairView):
             target_user_id=str(user.user_id),
         )
 
-        response = Response(status=status.HTTP_200_OK)
+        from users.serializers import EmbeddedUserSerializer
+        response = Response(
+            {
+                "user": EmbeddedUserSerializer(user).data,
+            },
+            status=status.HTTP_200_OK
+        )
 
         return set_auth_cookies(response, str(refresh.access_token), str(refresh))
 

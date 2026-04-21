@@ -1,23 +1,25 @@
 import { env } from "$env/dynamic/private";
-import type { ApiError } from "./types";
+import type { ApiError, ApiResult } from "./types";
 
 export interface ApiFetchOptions extends RequestInit {
     params?: Record<string, string>;
+    authToken?: string;     // Manual Bearer token for server-side bridging
+    refreshCookie?: string; // Manual refresh cookie for server-side bridging
 }
 
 /**
  * Centralized fetch wrapper for the Marketplace API.
  * 
- * Implements core requirements from the Authentication API Guide:
- * - credentials: 'include' (Section 1.1)
- * - Trailing slashes (Section 1.2 usage)
- * - Standardized error handling (Section 5)
+ * Implements core requirements:
+ * - credentials: 'include'
+ * - Trailing slashes
+ * - Standardized error handling via ApiResult union
  */
 export async function apiFetch<T>(
     path: string,
     options: ApiFetchOptions = {},
     customFetch: typeof fetch = fetch
-): Promise<{ data: T | null; error: ApiError | null; status: number; ok: boolean, headers: Headers | null }> {
+): Promise<ApiResult<T>> {
 
     // 1. URL Normalization
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
@@ -36,6 +38,14 @@ export async function apiFetch<T>(
         headers.set('Content-Type', 'application/json');
     }
 
+    // 2.1 Manual Token Bridging (for server-side internal calls)
+    if (options.authToken) {
+        headers.set('Authorization', `Bearer ${options.authToken}`);
+    }
+    if (options.refreshCookie) {
+        headers.set('Cookie', `refresh_token=${options.refreshCookie}`);
+    }
+
     const fetchOptions: RequestInit = {
         ...options,
         headers,
@@ -47,35 +57,58 @@ export async function apiFetch<T>(
 
         // Handle 204 No Content
         if (response.status === 204) {
-            return { data: null, error: null, status: 204, ok: true, headers: response.headers };
+            return { ok: true, status: 204, data: null as any, headers: response.headers, error: null };
         }
 
-        const isJson = response.headers.get('content-type')?.includes('application/json');
-        const body = isJson ? await response.json() : null;
+        const contentType = response.headers.get('content-type');
+        const isJson = contentType?.includes('application/json');
+        
+        // Only attempt to parse JSON if content-type says so
+        let body: any = null;
+        if (isJson) {
+            try {
+                body = await response.json();
+            } catch (e) {
+                body = null;
+            }
+        }
 
         if (!response.ok) {
+            // Build a valid ApiError even if backend failed or returned non-JSON
+            const error: ApiError = {
+                success: false,
+                code: body?.code || 'server_error',
+                detail: body?.detail || `Request failed with status ${response.status}`,
+                errors: body?.errors || {}
+            };
+
             return {
-                data: null,
-                error: body as ApiError,
-                status: response.status,
                 ok: false,
+                status: response.status,
+                error,
+                data: null,
                 headers: response.headers
             };
         }
 
         return {
+            ok: true,
+            status: response.status,
             data: body as T,
             error: null,
-            status: response.status,
-            ok: true,
             headers: response.headers
         };
     } catch (err) {
         return {
-            data: null,
-            error: { detail: 'Backend service unreachable.' },
-            status: 500,
             ok: false,
+            status: 500,
+            error: {
+                success: false,
+                code: 'connection_error',
+                detail: 'Backend service unreachable.',
+                errors: {}
+            },
+            data: null,
             headers: null
         };
     }

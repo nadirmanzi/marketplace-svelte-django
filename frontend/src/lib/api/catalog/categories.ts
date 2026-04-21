@@ -21,7 +21,7 @@ export async function listCategories(
  * Section 3.2 of Catalog API Guide.
  */
 export async function getCategoryTree(customFetch: typeof fetch = fetch) {
-    return apiFetch<CategoryNode[]>('/catalog/categories/', { method: 'GET' }, customFetch);
+    return apiFetch<CategoryNode[]>('/catalog/categories/tree/', { method: 'GET' }, customFetch);
 }
 
 /**

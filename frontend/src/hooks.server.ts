@@ -1,5 +1,4 @@
-import { verifyToken, refreshToken } from "$lib/server/auth/tokens";
-import { getUserProfile } from "$lib/server/auth/users/me";
+import { refreshToken, getUserProfile } from "$lib/server/auth/session";
 import type { Handle } from "@sveltejs/kit";
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -40,7 +39,7 @@ export const handle: Handle = async ({ event, resolve }) => {
     // ─── 2. SESSION VALIDATION & IDENTITY ───────────────────────────────────
     // We fetch the full profile to ensure the session is still valid (session_version Check)
     // and to correctly set the password_expired state in locals.
-    const user = await getUserProfile(event.fetch);
+    const user = await getUserProfile(event.fetch, access_token);
 
     if (!user) {
         // Token might be valid but session revoked or user deleted

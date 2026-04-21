@@ -54,7 +54,7 @@ class UserActionPermission(permissions.BasePermission):
         # For retrieve (detail view), restrict to staff/admin only.
         # Regular users must use the /me endpoint.
         if view.action == 'retrieve':
-            return user.has_perm('users.view_user')
+            return user.is_staff
         
         # For create (registration), typically anyone can create
         # But you might want to restrict this
@@ -67,13 +67,13 @@ class UserActionPermission(permissions.BasePermission):
         
         # For custom actions (deactivate, activate, soft_delete)
         if view.action == 'deactivate':
-            return user.has_perm('users.can_deactivate_user')
+            return user.is_staff
         
         if view.action == 'activate':
-            return user.has_perm('users.can_activate_user')
+            return user.is_staff
         
         if view.action == 'soft_delete':
-            return user.has_perm('users.can_soft_delete_user')
+            return user.is_superuser
         
         if view.action == 'change_password':
             return True

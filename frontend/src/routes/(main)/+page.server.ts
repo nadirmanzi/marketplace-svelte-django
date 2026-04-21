@@ -1,6 +1,6 @@
 // import type { PageServerLoad } from "./$types";
 // // import { fetchProducts } from "$lib/server/fetch/products";
-// import { getSession } from "$lib/server/auth/users/session";
+// import { getSession } from "$lib/server/auth/session";
 
 // export const load: PageServerLoad = async ({ fetch, locals, url }) => {
 

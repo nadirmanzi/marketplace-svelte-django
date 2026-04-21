@@ -33,10 +33,10 @@ from users.serializers import (
     AdminUserActionSerializer,
     UpdateUserSerializer,
     StaffUserActionSerializer,
-    ReadOnlyUserSerializer,
     MeSerializer,
     FullUserSerializer,
     RegisterSerializer,
+    EmbeddedUserSerializer,
 )
 from users.utils.permissions import UserActionPermission
 from users.models import User
@@ -50,11 +50,20 @@ logger = logging.getLogger(__name__)
 
 
 @extend_schema_view(
-    create=extend_schema(summary="Register User", description="Public endpoint to register a new user."),
-    list=extend_schema(summary="List Users", description="List users based on role (Self/Staff/Superuser)."),
-    retrieve=extend_schema(summary="Retrieve User", description="Get a specific user's details."),
+    create=extend_schema(
+        summary="Register User", description="Public endpoint to register a new user."
+    ),
+    list=extend_schema(
+        summary="List Users",
+        description="List users based on role (Self/Staff/Superuser).",
+    ),
+    retrieve=extend_schema(
+        summary="Retrieve User", description="Get a specific user's details."
+    ),
     update=extend_schema(summary="Update User", description="Update a user's details."),
-    partial_update=extend_schema(summary="Partial Update User", description="Partially update a user's details."),
+    partial_update=extend_schema(
+        summary="Partial Update User", description="Partially update a user's details."
+    ),
 )
 class UserManagementViewSet(viewsets.ModelViewSet):
     """
@@ -108,16 +117,16 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         - update/partial_update -> UpdateUserSerializer
         - deactivate/activate/soft_delete -> StaffUserActionSerializer
         - set_staff_status/set_superuser_status/manage_groups/manage_permissions -> AdminUserActionSerializer
-        - list -> ReadOnlyUserSerializer
+        - list -> MeSerializer
         """
         if self.action == "create":
             return RegisterSerializer
-        if self.action == "me":
-            return MeSerializer
         if self.action == "retrieve":
             return FullUserSerializer
         if self.action in ["update", "partial_update"]:
             return UpdateUserSerializer
+        if self.action == "me":
+            return MeSerializer
         elif self.action in ["deactivate", "activate", "soft_delete"]:
             return StaffUserActionSerializer
         elif self.action in [
@@ -127,7 +136,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             "manage_permissions",
         ]:
             return AdminUserActionSerializer
-        return ReadOnlyUserSerializer
+        return MeSerializer
 
     def get_permissions(self):
         """
@@ -157,12 +166,14 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             # Prevent aggressive scraping of user list
             from users.throttling import SearchRateThrottle
+
             return [SearchRateThrottle()]
 
         if self.action == "change_password":
             from users.throttling import SensitiveActionRateThrottle
+
             return [SensitiveActionRateThrottle()]
-            
+
         return [UserActionThrottle()]
 
     def create(self, request, *args, **kwargs):
@@ -171,14 +182,13 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
         POST /users/management/
         Body: {
-            "email": "user@example.com",
-            "full_name": "John Doe",
-            "telephone_number": "+1234567890",  # optional
-            "password": "secure_password"
+            "email": "...",
+            "full_name": "...",
+            "password": "..."
         }
 
         Returns:
-            201: Empty body. Tokens set via cookies.
+            201: User profile object. Tokens set via cookies.
             400: Validation errors.
         """
         serializer = self.get_serializer(data=request.data)
@@ -188,17 +198,21 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         user = serializer.save()
 
         # Tokens are generated during creation; set them as cookies
-        response = Response(status=status.HTTP_201_CREATED)
+        # Use MeSerializer to return the new user profile data as per Section 3.1 of API Guide
+        response_data = RegisterSerializer(user).data
+        response = Response(response_data, status=status.HTTP_201_CREATED)
+        
         if hasattr(user, "_auth_tokens"):
             return set_auth_cookies(
-                response, 
-                user._auth_tokens["access"], 
-                user._auth_tokens["refresh"]
+                response, user._auth_tokens["access"], user._auth_tokens["refresh"]
             )
 
         return response
 
-    @extend_schema(summary="Deactivate User", description="Temporarily disable a user account (staff only).")
+    @extend_schema(
+        summary="Deactivate User",
+        description="Temporarily disable a user account (staff only).",
+    )
     @action(detail=True, methods=["post"], url_path="deactivate")
     def deactivate(self, request, pk=None):
         """
@@ -207,7 +221,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         POST /users/management/{pk}/deactivate/
 
         Returns:
-            200: {"detail": "...", "user": {user_id, email}}
+            200: {"detail": "...", "user": {user_id, email, full_name}}
         """
         user = self.get_object()
         user = UserManagementService.deactivate_user(user)
@@ -215,12 +229,15 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "detail": "User has been deactivated.",
-                "user": ReadOnlyUserSerializer(user, fields=["user_id", "email"]).data,
+                "user": EmbeddedUserSerializer().data,
             },
             status=status.HTTP_200_OK,
         )
 
-    @extend_schema(summary="Activate User", description="Re-enable a deactivated or soft-deleted user account (staff only).")
+    @extend_schema(
+        summary="Activate User",
+        description="Re-enable a deactivated or soft-deleted user account (staff only).",
+    )
     @action(detail=True, methods=["post"], url_path="activate")
     def activate(self, request, pk=None):
         """
@@ -229,7 +246,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         POST /users/management/{pk}/activate/
 
         Returns:
-            200: {"detail": "...", "user": {user_id, email}}
+            200: {"detail": "...", "user": {user_id, email, full_name}}
         """
         user = self.get_object()
         user = UserManagementService.activate_user(user)
@@ -237,12 +254,15 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "detail": "User has been activated.",
-                "user": ReadOnlyUserSerializer(user, fields=["user_id", "email"]).data,
+                "user": MeSerializer().data,
             },
             status=status.HTTP_200_OK,
         )
 
-    @extend_schema(summary="Soft Delete User", description="Mark user as deleted while preserving all data (reversible, staff only).")
+    @extend_schema(
+        summary="Soft Delete User",
+        description="Mark user as deleted while preserving all data (reversible, staff only).",
+    )
     @action(detail=True, methods=["post"], url_path="soft-delete")
     def soft_delete(self, request, pk=None):
         """
@@ -251,7 +271,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         POST /users/management/{pk}/soft-delete/
 
         Returns:
-            200: {"detail": "...", "user": {user_id, email}}
+            200: {"detail": "...", "user": {user_id, email, full_name}}
         """
         user = self.get_object()
         user = UserManagementService.soft_delete_user(user)
@@ -259,12 +279,15 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         return Response(
             {
                 "detail": "User has been soft-deleted.",
-                "user": ReadOnlyUserSerializer(user, fields=["user_id", "email"]).data,
+                "user": MeSerializer().data,
             },
             status=status.HTTP_200_OK,
         )
 
-    @extend_schema(summary="Current User Profile", description="Return the authenticated user's own non-sensitive profile.")
+    @extend_schema(
+        summary="Current User Profile",
+        description="Return the authenticated user's own non-sensitive profile.",
+    )
     @action(detail=False, methods=["get"], url_path="me")
     def me(self, request):
         """
@@ -279,12 +302,15 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
-    @extend_schema(summary="Change Password", description="Change the authenticated user's password.")
+    @extend_schema(
+        summary="Change Password",
+        description="Change the authenticated user's password.",
+    )
     @action(detail=False, methods=["post"], url_path="change-password")
     def change_password(self, request):
         """
         Change the authenticated user's password.
-        
+
         POST /users/management/change-password/
         Body: {
             "old_password": "...",
@@ -293,15 +319,19 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         }
         """
         from users.serializers import ChangePasswordSerializer
-        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+
+        serializer = ChangePasswordSerializer(
+            data=request.data, context={"request": request}
+        )
         serializer.is_valid(raise_exception=True)
-        
+
         user = request.user
         user.set_password(serializer.validated_data["new_password"])
         user.save()
-        
+
         # Log successful password change
         from config.logging import audit_log
+
         audit_log.info(
             action="auth.password_changed",
             message="User changed their password successfully",
@@ -309,20 +339,25 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             source="users.views.UserManagementViewSet.change_password",
             target_user_id=str(user.user_id),
         )
-        
+
         # Return new tokens in cookies so the user stays logged in
         from users.tokens import CustomRefreshToken
+
         refresh = CustomRefreshToken.for_user(user)
-        
-        response = Response({
-            "detail": "Password has been changed successfully."
-        }, status=status.HTTP_200_OK)
-        
+
+        response = Response(
+            {"detail": "Password has been changed successfully."},
+            status=status.HTTP_200_OK,
+        )
+
         return set_auth_cookies(response, str(refresh.access_token), str(refresh))
 
     # --- SUPERUSER-ONLY ACTIONS ---
 
-    @extend_schema(summary="Set Staff Status", description="Grant or revoke staff status (superuser only).")
+    @extend_schema(
+        summary="Set Staff Status",
+        description="Grant or revoke staff status (superuser only).",
+    )
     @action(detail=True, methods=["post"], url_path="set-staff-status")
     def set_staff_status(self, request, pk=None):
         """
@@ -339,9 +374,12 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             user, request.data.get("is_staff")
         )
 
-        return Response(ReadOnlyUserSerializer(user).data)
+        return Response(MeSerializer().data)
 
-    @extend_schema(summary="Set Superuser Status", description="Grant or revoke superuser status (superuser only).")
+    @extend_schema(
+        summary="Set Superuser Status",
+        description="Grant or revoke superuser status (superuser only).",
+    )
     @action(detail=True, methods=["post"], url_path="set-superuser-status")
     def set_superuser_status(self, request, pk=None):
         """
@@ -365,9 +403,12 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             user, request.data.get("is_superuser")
         )
 
-        return Response(ReadOnlyUserSerializer(user).data)
+        return Response(MeSerializer(user).data)
 
-    @extend_schema(summary="Manage Groups", description="Add or remove a user from permission groups (superuser only).")
+    @extend_schema(
+        summary="Manage Groups",
+        description="Add or remove a user from permission groups (superuser only).",
+    )
     @action(detail=True, methods=["post"], url_path="manage-groups")
     def manage_groups(self, request, pk=None):
         """
@@ -402,7 +443,10 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             }
         )
 
-    @extend_schema(summary="Manage Permissions", description="Add or remove individual permissions from a user (superuser only).")
+    @extend_schema(
+        summary="Manage Permissions",
+        description="Add or remove individual permissions from a user (superuser only).",
+    )
     @action(detail=True, methods=["post"], url_path="manage-permissions")
     def manage_permissions(self, request, pk=None):
         """
@@ -428,7 +472,9 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         action_type = request.data.get("action")
         permission_ids = request.data.get("permission_ids", [])
 
-        user = UserManagementService.manage_permissions(user, action_type, permission_ids)
+        user = UserManagementService.manage_permissions(
+            user, action_type, permission_ids
+        )
 
         return Response(
             {

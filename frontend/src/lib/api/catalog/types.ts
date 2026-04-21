@@ -1,7 +1,15 @@
 /**
  * Data models for the Catalog System.
- * Based on Catalog API Guide.
+ * Based on Catalog API Guide & FinalPricingService.
  */
+
+export interface DiscountInfo {
+    discount_id: string;
+    name: string;
+    type: 'percentage' | 'fixed_amount';
+    value: string; // Decimal
+    scope: 'variant' | 'product' | 'category';
+}
 
 export interface Category {
     category_id: string; // UUID
@@ -12,6 +20,7 @@ export interface Category {
     parent_id: string | null;
     depth: number;
     subcategory_count: number;
+    discount: DiscountInfo | null;
 }
 
 export interface CategoryNode extends Category {
@@ -24,7 +33,7 @@ export interface AttributeDefinition {
     slug: string;
     input_type: 'text' | 'number' | 'boolean' | 'select' | 'multi-select';
     unit: string | null;
-    options: string[] | null;
+    options: { option_id: string; value: string }[] | null;
 }
 
 export interface CategoryAttribute {
@@ -36,6 +45,8 @@ export interface ProductAttributeValue {
     attribute_id: string;
     name: string;
     slug: string;
+    input_type: string;
+    unit: string | null;
     value: any; // String, Number, Boolean, or Array
 }
 
@@ -43,11 +54,13 @@ export interface ProductVariant {
     variant_id: string;
     sku: string;
     name: string;
-    price: string; // Decimal string
+    base_price: string;
+    final_price: string;
     in_stock: boolean;
     stock_quantity: number;
-    images: string[];
+    images: { image_id: number; image: string; thumbnail: string; alt_text: string }[];
     attributes: ProductAttributeValue[];
+    discount: DiscountInfo | null;
 }
 
 export interface ProductBlueprint {
@@ -56,12 +69,14 @@ export interface ProductBlueprint {
     slug: string;
     description: string;
     base_price: string;
+    final_price: string;
     is_published: boolean;
     category_id: string;
     category_name: string;
-    images: string[];
+    images: { image_id: number; image: string; thumbnail: string; alt_text: string }[];
     attributes: ProductAttributeValue[];
     variants: ProductVariant[];
+    discount: DiscountInfo | null;
     created_at: string;
     updated_at: string;
 }

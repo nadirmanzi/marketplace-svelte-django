@@ -4,7 +4,7 @@ import { fail, redirect } from "@sveltejs/kit";
 import { zod4 } from "sveltekit-superforms/adapters";
 import { signup_schema } from "$lib/schemas/auth";
 import { signup } from "$lib/server/auth/users/signup";
-import { guardAuth } from "$lib/server/auth/users/session";
+import { guardAuth } from "$lib/server/auth/session";
 
 export const load: PageServerLoad = async ({ locals, url }) => {
     guardAuth(locals, url);
