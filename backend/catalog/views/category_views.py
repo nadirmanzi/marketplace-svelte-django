@@ -76,8 +76,7 @@ class CategoryPublicViewSet(
     def get_queryset(self):
         if self.action == "tree":
             return (
-                Category.objects
-                .active()
+                Category.objects.active()
                 .roots()
                 .prefetch_related("subcategories")
                 .order_by("name")
@@ -89,6 +88,16 @@ class CategoryPublicViewSet(
             return CategoryTreeSerializer
         return CategorySerializer
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"categories": serializer.data})
+
     @extend_schema(
         summary="List Category Tree",
         description="Returns all active root categories with their nested subcategories.",
@@ -98,7 +107,7 @@ class CategoryPublicViewSet(
     def tree(self, request):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
+        return Response({"categories": serializer.data})
 
     def retrieve(self, request, *args, **kwargs):
         """Get a single category by slug (must be active)."""
@@ -110,7 +119,7 @@ class CategoryPublicViewSet(
                 status=status.HTTP_404_NOT_FOUND,
             )
         serializer = self.get_serializer(category)
-        return Response(serializer.data)
+        return Response({"category": serializer.data})
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +174,16 @@ class CategoryManagementViewSet(viewsets.ModelViewSet):
         """Return all categories (including inactive) for management."""
         return Category.objects.all().select_related("parent").order_by("name")
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"categories": serializer.data})
+
     def get_serializer_class(self):
         if self.action in ("create", "update", "partial_update"):
             return CategoryWriteSerializer
@@ -181,7 +200,7 @@ class CategoryManagementViewSet(viewsets.ModelViewSet):
         )
 
         return Response(
-            CategorySerializer(category).data,
+            {"category": CategorySerializer(category).data},
             status=status.HTTP_201_CREATED,
         )
 
@@ -197,7 +216,7 @@ class CategoryManagementViewSet(viewsets.ModelViewSet):
             **serializer.validated_data,
         )
 
-        return Response(CategorySerializer(category).data)
+        return Response({"category": CategorySerializer(category).data})
 
     def partial_update(self, request, *args, **kwargs):
         """Partial update via service layer."""
@@ -211,7 +230,7 @@ class CategoryManagementViewSet(viewsets.ModelViewSet):
             **serializer.validated_data,
         )
 
-        return Response(CategorySerializer(category).data)
+        return Response({"category": CategorySerializer(category).data})
 
     @extend_schema(
         summary="Deactivate Category",
@@ -227,7 +246,7 @@ class CategoryManagementViewSet(viewsets.ModelViewSet):
             performed_by=request.user,
             category=category,
         )
-        return Response(CategorySerializer(category).data)
+        return Response({"category": CategorySerializer(category).data})
 
     @extend_schema(
         summary="Activate Category",
@@ -243,4 +262,4 @@ class CategoryManagementViewSet(viewsets.ModelViewSet):
             performed_by=request.user,
             category=category,
         )
-        return Response(CategorySerializer(category).data)
+        return Response({"category": CategorySerializer(category).data})

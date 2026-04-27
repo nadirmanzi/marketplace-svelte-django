@@ -4,7 +4,7 @@
 
 	let { data }: PageProps = $props();
 
-	const categories = $derived(data.categories.data);
+	const categories = $derived(data.categories);
 </script>
 
 {#snippet CategoryItem(category: CategoryNode, depth = 0)}

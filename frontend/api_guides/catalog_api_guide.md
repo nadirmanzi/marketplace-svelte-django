@@ -43,25 +43,27 @@ Retrieves a flat list of categories, typically for admin tables or simple select
   | `is_root` | Boolean| Filter for top-level categories only. |
 - **Response (200 OK)**:
   ```json
-  [
-    {
-      "category_id": "uuid",
-      "name": "Electronics",
-      "slug": "electronics",
-      "description": "Gadgets and more",
-      "image": "url/null",
-      "parent_id": "uuid/null",
-      "depth": 0,
-      "subcategory_count": 5
-    }
-  ]
+  {
+    "categories": [
+      {
+        "category_id": "uuid",
+        "name": "Electronics",
+        "slug": "electronics",
+        "description": "Gadgets and more",
+        "image": "url/null",
+        "parent_id": "uuid/null",
+        "depth": 0,
+        "subcategory_count": 5
+      }
+    ]
+  }
   ```
 
 ### 3.2. Category Tree
 Retrieves the full hierarchical structure, optimized for navigation menus.
 
 - **URL**: `GET /catalog/categories/tree/` (Note: Implemented as a viewset action)
-- **Response (200 OK)**: Nested `children` arrays.
+- **Response (200 OK)**: Nested `children` arrays, wrapped in `{"categories": [...]}`.
 
 ### 3.3. Category Attributes
 Retrieves the attributes that should be collected when creating a product in this category.
@@ -69,19 +71,21 @@ Retrieves the attributes that should be collected when creating a product in thi
 - **URL**: `GET /catalog/categories/{category_id}/attributes/`
 - **Response (200 OK)**:
   ```json
-  [
-    {
-      "attribute": {
-        "attribute_id": "uuid",
-        "name": "Screen Size",
-        "slug": "screen-size",
-        "input_type": "number",
-        "unit": "inches",
-        "options": []
-      },
-      "order": 1
-    }
-  ]
+  {
+    "attributes": [
+      {
+        "attribute": {
+          "attribute_id": "uuid",
+          "name": "Screen Size",
+          "slug": "screen-size",
+          "input_type": "number",
+          "unit": "inches",
+          "options": []
+        },
+        "order": 1
+      }
+    ]
+  }
   ```
 
 ---
@@ -101,32 +105,35 @@ Public listing of published products. Includes active variants by default.
   | `name` | String | Title search (icontains). |
 - **Response (200 OK)**:
   ```json
-  [
-    {
-      "product_id": "uuid",
-      "name": "Smartphone X",
-      "slug": "smartphone-x",
-      "base_price": "999.00",
-      "is_published": true,
-      "category_name": "Electronics",
-      "images": [...],
-      "variants": [
-        {
-          "variant_id": "uuid",
-          "name": "128GB - Black",
-          "price": "999.00",
-          "in_stock": true
-        }
-      ]
-    }
-  ]
+  {
+    "products": [
+      {
+        "product_id": "uuid",
+        "name": "Smartphone X",
+        "slug": "smartphone-x",
+        "base_price": "999.00",
+        "is_published": true,
+        "category_name": "Electronics",
+        "images": [...],
+        "user": { "user_id": "...", "email": "...", "full_name": "..." },
+        "variants": [
+          {
+            "variant_id": "uuid",
+            "name": "128GB - Black",
+            "price": "999.00",
+            "in_stock": true
+          }
+        ]
+      }
+    ]
+  }
   ```
 
 ### 3.2. Product Detail
 Retrieves full details of a single product using its slug.
 
 - **URL**: `GET /catalog/products/{slug}/`
-- **Response (200 OK)**: Extensive data including all `attributes`, `images`, and `variants`.
+- **Response (200 OK)**: Wrapped in `{"product": {...}}`. Extensive data including all `attributes`, `images`, `variants`, and the owner `user`.
 
 ---
 
@@ -169,13 +176,25 @@ Atomically increase or decrease stock.
 
 - **URL**: `POST /catalog/variants/manage/{id}/adjust-stock/`
 - **Body**: `{ "quantity_delta": 5 }` (Use negative for reductions)
-- **Response**: Updated variant object.
+- **Response**: Updated `{"variant": {...}}` object.
 
 ---
 
 ## 7. Detailed Data Models
 
-### 7.1. Attribute Values
+### 7.1. Product blueprint
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `product_id` | UUID | Unique identifier. |
+| `name` | String | Product title. |
+| `slug` | String | URL-friendly identifier. |
+| `user` | EmbeddedUser | Owner information. |
+| `created_at` | DateTime | Creation timestamp. |
+| `updated_at` | DateTime | Last update timestamp. |
+
+### 7.2. Attribute Values
+
 Attributes are returned as a unified list regardless of their internal storage (text, number, etc).
 
 | Field | Type | Description |
@@ -184,9 +203,6 @@ Attributes are returned as a unified list regardless of their internal storage (
 | `name` | String | Display name. |
 | `slug` | String | Internal ID for frontend logic. |
 | `value` | Mixed | Can be String, Number, Boolean, or Array (for multiselect). |
-
-### 7.2. Images
-Inheritance: If a Variant has no specific images, it falls back to the parent Product images.
 
 ---
 

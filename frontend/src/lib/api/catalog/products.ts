@@ -1,5 +1,6 @@
 import { apiFetch } from "../client";
 import type { ProductBlueprint, ProductFilter } from "./types";
+import type { ProductListResponse, ProductDetailResponse } from "$lib/api/types";
 
 /**
  * Public listing of products with filtering.
@@ -17,7 +18,7 @@ export async function listProducts(
     if (filters.page) params.page = String(filters.page);
     if (filters.page_size) params.page_size = String(filters.page_size);
 
-    return apiFetch<ProductBlueprint[]>('/catalog/products/', { params }, customFetch);
+    return apiFetch<ProductListResponse>('/catalog/products/', { params }, customFetch);
 }
 
 /**
@@ -25,5 +26,5 @@ export async function listProducts(
  * Section 4.2 of Catalog API Guide.
  */
 export async function getProductDetail(slug: string, customFetch: typeof fetch = fetch) {
-    return apiFetch<ProductBlueprint>(`/catalog/products/${slug}/`, { method: 'GET' }, customFetch);
+    return apiFetch<ProductDetailResponse>(`/catalog/products/${slug}/`, { method: 'GET' }, customFetch);
 }

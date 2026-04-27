@@ -1,5 +1,5 @@
 import { apiFetch } from "$lib/api/client";
-import type { UserProfile, SignupResponse } from "$lib/api/types";
+import type { EmbeddedUser, SignupResponse } from "$lib/api/types";
 import type { RequestEvent } from "@sveltejs/kit";
 import { forwardCookies } from "../cookies";
 
@@ -9,7 +9,7 @@ import { forwardCookies } from "../cookies";
 export interface SignupResult {
     success: boolean;
     status_code: number;
-    user?: UserProfile;
+    user?: EmbeddedUser;
     error?: string;
     fieldErrors?: Record<string, string>;
 }
@@ -60,6 +60,6 @@ export const signup = async (
     return {
         success: true,
         status_code: res.status,
-        user: res.data
+        user: res.data.user
     };
 };

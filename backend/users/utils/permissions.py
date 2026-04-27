@@ -1,9 +1,10 @@
 from rest_framework import permissions
 
+
 class UserActionPermission(permissions.BasePermission):
     """
     Permission class for user management with field-level restrictions.
-    
+
     Rules:
     - Superusers can do anything
     - Non-superusers cannot modify superuser accounts
@@ -14,143 +15,151 @@ class UserActionPermission(permissions.BasePermission):
     - Self-modification of sensitive fields is prohibited
     - ONLY superusers can modify: is_staff, is_superuser, groups, user_permissions
     """
-    
+
     # Fields users can modify on their own profile
-    SELF_EDITABLE_FIELDS = {'email', 'full_name', 'telephone_number'}
-    
+    SELF_EDITABLE_FIELDS = {"email", "full_name", "telephone_number"}
+
     # Fields that require special permissions (even for staff)
     SENSITIVE_FIELDS = {
-        'is_active', 'is_superuser', 
-        'is_staff', 'user_permissions', 'groups',
-        'password_changed_at', 'session_version'
+        "is_active",
+        "is_superuser",
+        "is_staff",
+        "user_permissions",
+        "groups",
+        "password_changed_at",
+        "session_version",
     }
-    
+
     # Fields that ONLY superusers can modify
     SUPERUSER_ONLY_FIELDS = {
-        'is_staff', 'is_soft_deleted', 'is_superuser', 'user_permissions', 'groups'
+        "is_staff",
+        "is_soft_deleted",
+        "is_superuser",
+        "user_permissions",
+        "groups",
     }
-    
+
     def has_permission(self, request, view):
         """
         Check view-level permissions (list, create actions).
-        
+
         Returns:
             bool: True if user can access this view action
         """
         user = request.user
-        
+
         # Must be authenticated
         if not user or not user.is_authenticated:
             return False
-        
+
         # Superusers can do anything
         if user.is_superuser:
             return True
-        
+
         # For list action, user must have view_user permission
-        if view.action == 'list':
-            return user.has_perm('users.view_user')
-        
+        if view.action == "list":
+            return user.has_perm("users.view_user")
+
         # For retrieve (detail view), restrict to staff/admin only.
         # Regular users must use the /me endpoint.
-        if view.action == 'retrieve':
+        if view.action == "retrieve":
             return user.is_staff
-        
+
         # For create (registration), typically anyone can create
         # But you might want to restrict this
-        if view.action == 'create':
+        if view.action == "create":
             return True  # Or add your own logic
-        
+
         # For update/partial_update/delete actions
-        if view.action in ['update', 'partial_update', 'destroy']:
+        if view.action in ["update", "partial_update", "destroy"]:
             return True  # Will be checked in has_object_permission
-        
+
         # For custom actions (deactivate, activate, soft_delete)
-        if view.action == 'deactivate':
-            return user.is_staff
-        
-        if view.action == 'activate':
-            return user.is_staff
-        
-        if view.action == 'soft_delete':
-            return user.is_superuser
-        
-        if view.action == 'change_password':
+        if view.action == "deactivate":
+            return user.has_perm("users.can_deactivate_user")
+
+        if view.action == "activate":
+            return user.has_perm("users.can_activate_user")
+
+        if view.action == "soft_delete":
+            return user.has_perm("users.can_soft_delete_user")
+
+        if view.action == "change_password":
             return True
-            
+
         # Default deny for unknown actions
         return False
-    
+
     def has_object_permission(self, request, view, obj):
         """
         Check object-level permissions (retrieve, update, delete on specific user).
-        
+
         Returns:
             bool: True if user can perform action on this specific user object
         """
         user = request.user
-        
+
         # Superusers can do anything
         if user.is_superuser:
             return True
-        
+
         # Non-superusers cannot touch superuser accounts at all
         if obj.is_superuser:
             return False
-        
-        is_self = (obj == user)
+
+        is_self = obj == user
 
         # Prevent staff from deactivating/soft-deleting themselves
-        if is_self and view.action in ('deactivate', 'soft_delete'):
+        if is_self and view.action in ("deactivate", "soft_delete"):
             return False
-        
+
         # Safe methods (GET, HEAD, OPTIONS) - retrieve action
         if request.method in permissions.SAFE_METHODS:
             # Users can view themselves OR staff with view_user can view anyone
-            return is_self or user.has_perm('users.view_user')
-        
+            return is_self or user.has_perm("users.view_user")
+
         data = request.data
-        
+
         # --- CHECK FOR SUPERUSER-ONLY FIELDS ---
         # Non-superusers cannot modify these fields AT ALL (not even on themselves)
         attempted_superuser_fields = set(data.keys()) & self.SUPERUSER_ONLY_FIELDS
         if attempted_superuser_fields:
             return False  # Only superusers can touch these fields
-        
+
         # --- SELF-MODIFICATION RULES ---
         if is_self:
             # Users CANNOT modify any sensitive fields on themselves
             if any(field in data for field in self.SENSITIVE_FIELDS):
                 return False
-            
+
             # Users CAN modify their own profile fields
             # Check that they're only modifying allowed fields
             attempted_fields = set(data.keys())
             if attempted_fields <= self.SELF_EDITABLE_FIELDS:
                 return True
-            
+
             # If trying to modify fields beyond self-editable ones, deny
             return False
-        
+
         # --- MODIFYING OTHER USERS ---
         # Must have base change_user permission to modify anyone else
-        if not user.has_perm('users.change_user'):
+        if not user.has_perm("users.change_user"):
             return False
-        
+
         # Check specific action permissions
-        if 'is_active' in data:
-            if data.get('is_active') is False:
+        if "is_active" in data:
+            if data.get("is_active") is False:
                 # Deactivating someone
-                if not user.has_perm('users.can_deactivate_user'):
+                if not user.has_perm("users.can_deactivate_user"):
                     return False
-            elif data.get('is_active') is True:
+            elif data.get("is_active") is True:
                 # Activating someone
-                if not user.has_perm('users.can_activate_user'):
+                if not user.has_perm("users.can_activate_user"):
                     return False
-        
-        if 'is_soft_deleted' in data:
-            if not user.has_perm('users.can_soft_delete_user'):
+
+        if "is_soft_deleted" in data:
+            if not user.has_perm("users.can_soft_delete_user"):
                 return False
-        
+
         # All checks passed
         return True

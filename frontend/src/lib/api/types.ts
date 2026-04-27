@@ -19,9 +19,18 @@ export interface ApiSuccess<T> {
 /**
  * Discriminated union for API return results.
  */
-export type ApiResult<T> = 
+export type ApiResult<T> =
     | { ok: true; status: number; data: T; error: null; headers: Headers }
     | { ok: false; status: number; error: ApiError; data: null; headers: Headers | null };
+
+/**
+ * Minimal user representation embedded in other resources.
+ */
+export interface EmbeddedUser {
+    user_id: string;
+    email: string;
+    full_name: string;
+}
 
 /**
  * Standard User Profile as per Section 6 of the API Guide.
@@ -51,9 +60,44 @@ export interface LoginResponse {
 /**
  * Response for POST /users/management/ (Signup)
  */
-export type SignupResponse = UserProfile;
+export interface SignupResponse {
+    user: EmbeddedUser;
+}
 
 /**
  * Response for GET /users/management/me/
  */
-export type MeResponse = UserProfile;
+export interface MeResponse {
+    user: UserProfile;
+}
+
+/** 
+ * Catalog Categories Responses
+ */
+export interface CategoryTreeResponse {
+    data: {
+        categories: any[]; // Recursive structure
+    }
+}
+
+export interface CategoryDetailResponse {
+    category: any;
+}
+
+/**
+ * Catalog Product Responses
+ */
+export interface ProductListResponse {
+    products: any[];
+}
+
+export interface ProductDetailResponse {
+    product: any;
+}
+
+/**
+ * Catalog Variant Responses
+ */
+export interface VariantDetailResponse {
+    variant: any;
+}

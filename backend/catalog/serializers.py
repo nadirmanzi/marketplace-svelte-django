@@ -23,6 +23,7 @@ from .models import (
     ProductAttributeValue,
     VariantAttributeValue,
 )
+from users.serializers import EmbeddedUserSerializer
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +314,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     category_name = serializers.CharField(source="category.name", read_only=True, default=None)
     category_id = serializers.UUIDField(source="category.category_id", read_only=True, allow_null=True)
-    user_email = serializers.EmailField(source="user.email", read_only=True)
+    user = EmbeddedUserSerializer(read_only=True)
     active_variant_count = serializers.IntegerField(read_only=True)
     is_published = serializers.BooleanField(read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
@@ -336,7 +337,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "is_published",
             "category_id",
             "category_name",
-            "user_email",
+            "user",
             "active_variant_count",
             "images",
             "attributes",

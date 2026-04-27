@@ -44,10 +44,17 @@ class DiscountManagementViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return Discount.objects.all().prefetch_related("categories", "products", "variants")
 
-    def get_serializer_class(self):
-        if self.action in ("create", "update", "partial_update"):
-            return DiscountWriteSerializer
         return DiscountSerializer
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"discounts": serializer.data})
 
     def create(self, request, *args, **kwargs):
         serializer = DiscountWriteSerializer(data=request.data)
@@ -57,7 +64,7 @@ class DiscountManagementViewSet(viewsets.ModelViewSet):
             performed_by=request.user,
             **serializer.validated_data,
         )
-        return Response(DiscountSerializer(discount).data, status=status.HTTP_201_CREATED)
+        return Response({"discount": DiscountSerializer(discount).data}, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         discount = self.get_object()
@@ -69,7 +76,7 @@ class DiscountManagementViewSet(viewsets.ModelViewSet):
             discount=discount,
             **serializer.validated_data,
         )
-        return Response(DiscountSerializer(discount).data)
+        return Response({"discount": DiscountSerializer(discount).data})
 
     def partial_update(self, request, *args, **kwargs):
         discount = self.get_object()

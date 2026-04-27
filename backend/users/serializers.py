@@ -70,7 +70,7 @@ class UserUpdateMixin:
 # Embedded user (for resources like products)
 # -------------------------
 class EmbeddedUserSerializer(serializers.ModelSerializer):
-    """Minimal user representation embedded in resource responses (e.g. products)."""
+    """Minimal user representation embedded in resource responses (e.g. products) or for minimal user information."""
 
     class Meta:
         model = User
@@ -135,6 +135,8 @@ class FullUserSerializer(serializers.ModelSerializer):
             "password_expires_in_days",
             "password_expired",
             "session_version",
+            "user_permissions",
+            "groups",
             "created_at",
             "updated_at",
         )

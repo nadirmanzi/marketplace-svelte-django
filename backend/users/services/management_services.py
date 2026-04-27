@@ -16,10 +16,10 @@ Methods:
 - manage_groups: Add/remove user from permission groups
 - manage_permissions: Add/remove individual permissions from user
 """
-from typing import Optional, List
+
+from typing import List
 from django.db import transaction, DatabaseError
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 from config.logging import audit_log
 from users.exceptions import (
     ConflictError,
@@ -146,7 +146,9 @@ class UserManagementService:
         Raises:
             ConflictError: If already active.
         """
-        if getattr(user, "is_active", True) and not getattr(user, "is_soft_deleted", False):
+        if getattr(user, "is_active", True) and not getattr(
+            user, "is_soft_deleted", False
+        ):
             raise ConflictError("User already active")
 
         try:
@@ -197,7 +199,7 @@ class UserManagementService:
                 status="success",
                 source="users.services.management_services",
                 target_user_id=str(user.user_id),
-                extra={"is_staff": is_staff}
+                extra={"is_staff": is_staff},
             )
             return user
         except DatabaseError as e:
@@ -237,7 +239,9 @@ class UserManagementService:
 
         # Safety guard: Check for last superuser
         if not is_superuser and user.is_last_superuser:
-            raise PermissionDeniedError("Cannot remove superuser status from the last superuser.")
+            raise PermissionDeniedError(
+                "Cannot remove superuser status from the last superuser."
+            )
 
         try:
             user.is_superuser = is_superuser
@@ -248,7 +252,7 @@ class UserManagementService:
                 status="success",
                 source="users.services.management_services",
                 target_user_id=str(user.user_id),
-                extra={"is_superuser": is_superuser}
+                extra={"is_superuser": is_superuser},
             )
             return user
         except DatabaseError as e:
@@ -283,10 +287,11 @@ class UserManagementService:
             raise ServiceValidationError("Action must be 'add' or 'remove'.")
 
         from django.contrib.auth.models import Group
+
         groups = Group.objects.filter(id__in=group_ids)
-        
+
         if groups.count() != len(group_ids):
-            found_ids = set(groups.values_list('id', flat=True))
+            found_ids = set(groups.values_list("id", flat=True))
             missing_ids = set(group_ids) - found_ids
             raise NotFoundError(f"Groups not found: {list(missing_ids)}")
 
@@ -302,7 +307,7 @@ class UserManagementService:
                 status="success",
                 source="users.services.management_services",
                 target_user_id=str(user.user_id),
-                extra={"group_ids": group_ids, "action": action}
+                extra={"group_ids": group_ids, "action": action},
             )
             return user
         except DatabaseError as e:
@@ -337,10 +342,11 @@ class UserManagementService:
             raise ServiceValidationError("Action must be 'add' or 'remove'.")
 
         from django.contrib.auth.models import Permission
+
         perms = Permission.objects.filter(id__in=permission_ids)
 
         if perms.count() != len(permission_ids):
-            found_ids = set(perms.values_list('id', flat=True))
+            found_ids = set(perms.values_list("id", flat=True))
             missing_ids = set(permission_ids) - found_ids
             raise NotFoundError(f"Permissions not found: {list(missing_ids)}")
 
@@ -356,7 +362,7 @@ class UserManagementService:
                 status="success",
                 source="users.services.management_services",
                 target_user_id=str(user.user_id),
-                extra={"permission_ids": permission_ids, "action": action}
+                extra={"permission_ids": permission_ids, "action": action},
             )
             return user
         except DatabaseError as e:

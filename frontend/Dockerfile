@@ -46,4 +46,4 @@ USER bun
 EXPOSE 5173
 
 # Start the application
-CMD ["bun", "./build/index.js"]
+CMD ["bun", "run", "dev"]

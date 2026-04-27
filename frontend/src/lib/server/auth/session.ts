@@ -1,5 +1,5 @@
 import { apiFetch } from "$lib/api/client";
-import type { UserProfile } from "$lib/api/types";
+import type { MeResponse, UserProfile } from "$lib/api/types";
 import { redirect, type RequestEvent } from "@sveltejs/kit";
 import { forwardCookies } from "./cookies";
 
@@ -18,12 +18,12 @@ export const getUserProfile = async (
     customFetch: typeof fetch,
     accessToken?: string
 ): Promise<UserProfile | null> => {
-    const res = await apiFetch<UserProfile>(
+    const res = await apiFetch<MeResponse>(
         '/users/management/me/',
         { method: 'GET', authToken: accessToken },
         customFetch
     );
-    return res.ok ? res.data : null;
+    return res.ok ? res.data.user : null;
 };
 
 /**

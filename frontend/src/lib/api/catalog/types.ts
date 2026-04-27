@@ -2,6 +2,7 @@
  * Data models for the Catalog System.
  * Based on Catalog API Guide & FinalPricingService.
  */
+import type { EmbeddedUser } from "../types";
 
 export interface DiscountInfo {
     discount_id: string;
@@ -21,6 +22,10 @@ export interface Category {
     depth: number;
     subcategory_count: number;
     discount: DiscountInfo | null;
+}
+
+export interface CategoryResponse {
+    category: Category;
 }
 
 export interface CategoryNode extends Category {
@@ -77,6 +82,7 @@ export interface ProductBlueprint {
     attributes: ProductAttributeValue[];
     variants: ProductVariant[];
     discount: DiscountInfo | null;
+    user: EmbeddedUser;
     created_at: string;
     updated_at: string;
 }

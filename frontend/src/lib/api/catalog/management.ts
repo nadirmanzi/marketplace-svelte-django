@@ -1,5 +1,6 @@
 import { apiFetch } from "../client";
 import type { ProductBlueprint, ProductVariant } from "./types";
+import type { ProductDetailResponse, VariantDetailResponse } from "$lib/api/types";
 
 /**
  * Creates a new product blueprint.
@@ -15,7 +16,7 @@ export async function createProduct(
     },
     customFetch: typeof fetch = fetch
 ) {
-    return apiFetch<ProductBlueprint>('/catalog/products/manage/', {
+    return apiFetch<ProductDetailResponse>('/catalog/products/manage/', {
         method: 'POST',
         body: JSON.stringify(data)
     }, customFetch);
@@ -26,7 +27,7 @@ export async function createProduct(
  * Section 5.2 of Catalog API Guide.
  */
 export async function publishProduct(productId: string, customFetch: typeof fetch = fetch) {
-    return apiFetch<ProductBlueprint>(`/catalog/products/manage/${productId}/publish/`, {
+    return apiFetch<ProductDetailResponse>(`/catalog/products/manage/${productId}/publish/`, {
         method: 'POST'
     }, customFetch);
 }
@@ -36,7 +37,7 @@ export async function publishProduct(productId: string, customFetch: typeof fetc
  * Section 5.2 of Catalog API Guide.
  */
 export async function archiveProduct(productId: string, customFetch: typeof fetch = fetch) {
-    return apiFetch<ProductBlueprint>(`/catalog/products/manage/${productId}/archive/`, {
+    return apiFetch<ProductDetailResponse>(`/catalog/products/manage/${productId}/archive/`, {
         method: 'POST'
     }, customFetch);
 }
@@ -50,7 +51,7 @@ export async function adjustStock(
     quantityDelta: number,
     customFetch: typeof fetch = fetch
 ) {
-    return apiFetch<ProductVariant>(`/catalog/variants/manage/${variantId}/adjust-stock/`, {
+    return apiFetch<VariantDetailResponse>(`/catalog/variants/manage/${variantId}/adjust-stock/`, {
         method: 'POST',
         body: JSON.stringify({ quantity_delta: quantityDelta })
     }, customFetch);

@@ -20,7 +20,7 @@ from django.db import models
 from django.db.models import Q, UniqueConstraint
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, Permission
 from django.contrib.auth.hashers import make_password
 from django.core.validators import validate_email
 
@@ -162,10 +162,10 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.email = normalize_email(self.email)
 
         if self.is_superuser:
-            self.is_active=True
-            self.is_staff=True
-            self.is_soft_deleted=False
-            self.soft_deleted_at=None
+            self.is_active = True
+            self.is_staff = True
+            self.is_soft_deleted = False
+            self.soft_deleted_at = None
 
         # Name normalization: strip whitespace from first/last names.
         for field in ["full_name"]:

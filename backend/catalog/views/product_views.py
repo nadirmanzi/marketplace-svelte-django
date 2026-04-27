@@ -89,6 +89,16 @@ class ProductPublicViewSet(
             .order_by("-created_at")
         )
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"products": serializer.data})
+
     def retrieve(self, request, *args, **kwargs):
         """Get a single published product by slug."""
         try:
@@ -104,7 +114,7 @@ class ProductPublicViewSet(
                 status=status.HTTP_404_NOT_FOUND,
             )
         serializer = self.get_serializer(product)
-        return Response(serializer.data)
+        return Response({"product": serializer.data})
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +177,16 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
             return ProductDetailSerializer
         return ProductSerializer
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"products": serializer.data})
+
     def create(self, request, *args, **kwargs):
         serializer = ProductWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -184,7 +204,7 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
             **data,
         )
         return Response(
-            ProductSerializer(product).data,
+            {"product": ProductSerializer(product).data},
             status=status.HTTP_201_CREATED,
         )
 
@@ -204,7 +224,7 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
             product=product,
             **data,
         )
-        return Response(ProductSerializer(product).data)
+        return Response({"product": ProductSerializer(product).data})
 
     def partial_update(self, request, *args, **kwargs):
         product = self.get_object()
@@ -222,7 +242,7 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
             product=product,
             **data,
         )
-        return Response(ProductSerializer(product).data)
+        return Response({"product": ProductSerializer(product).data})
 
     @extend_schema(
         summary="Archive Product",
@@ -236,7 +256,7 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
         product = ProductService.archive_product(
             performed_by=request.user, product=product
         )
-        return Response(ProductSerializer(product).data)
+        return Response({"product": ProductSerializer(product).data})
 
     @extend_schema(
         summary="Publish Product",
@@ -250,7 +270,7 @@ class ProductManagementViewSet(viewsets.ModelViewSet):
         product = ProductService.publish_product(
             performed_by=request.user, product=product
         )
-        return Response(ProductSerializer(product).data)
+        return Response({"product": ProductSerializer(product).data})
 
 
 # ---------------------------------------------------------------------------
@@ -311,6 +331,16 @@ class VariantManagementViewSet(viewsets.ModelViewSet):
             return ProductVariantWriteSerializer
         return ProductVariantSerializer
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"variants": serializer.data})
+
     def create(self, request, *args, **kwargs):
         serializer = ProductVariantWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -345,7 +375,7 @@ class VariantManagementViewSet(viewsets.ModelViewSet):
             **data,
         )
         return Response(
-            ProductVariantSerializer(variant).data,
+            {"variant": ProductVariantSerializer(variant).data},
             status=status.HTTP_201_CREATED,
         )
 
@@ -359,7 +389,7 @@ class VariantManagementViewSet(viewsets.ModelViewSet):
         variant = VariantService.update_variant(
             performed_by=request.user, variant=variant, **data
         )
-        return Response(ProductVariantSerializer(variant).data)
+        return Response({"variant": ProductVariantSerializer(variant).data})
 
     def partial_update(self, request, *args, **kwargs):
         variant = self.get_object()
@@ -371,7 +401,7 @@ class VariantManagementViewSet(viewsets.ModelViewSet):
         variant = VariantService.update_variant(
             performed_by=request.user, variant=variant, **data
         )
-        return Response(ProductVariantSerializer(variant).data)
+        return Response({"variant": ProductVariantSerializer(variant).data})
 
     @extend_schema(
         summary="Adjust Stock",
@@ -390,7 +420,7 @@ class VariantManagementViewSet(viewsets.ModelViewSet):
             variant=variant,
             quantity_delta=serializer.validated_data["quantity_delta"],
         )
-        return Response(ProductVariantSerializer(variant).data)
+        return Response({"variant": ProductVariantSerializer(variant).data})
 
     @extend_schema(
         summary="Deactivate Variant",
@@ -404,7 +434,7 @@ class VariantManagementViewSet(viewsets.ModelViewSet):
         variant = VariantService.deactivate_variant(
             performed_by=request.user, variant=variant
         )
-        return Response(ProductVariantSerializer(variant).data)
+        return Response({"variant": ProductVariantSerializer(variant).data})
 
     @extend_schema(
         summary="Activate Variant",
@@ -418,4 +448,4 @@ class VariantManagementViewSet(viewsets.ModelViewSet):
         variant = VariantService.activate_variant(
             performed_by=request.user, variant=variant
         )
-        return Response(ProductVariantSerializer(variant).data)
+        return Response({"variant": ProductVariantSerializer(variant).data})
