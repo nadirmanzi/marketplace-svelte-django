@@ -1,0 +1,83 @@
+@import 'tailwindcss';
+
+@import '@skeletonlabs/skeleton';
+@import '@skeletonlabs/skeleton-svelte';
+
+@import '@fontsource-variable/figtree/wght.css';
+@import '@fontsource-variable/plus-jakarta-sans/wght.css';
+@theme {
+	/* PRIMARY — Electric Blue #0066ff */
+	--color-primary: oklch(25% 0 0);
+	--color-primary-hover: oklch(15% 0 0);
+	--color-on-primary: oklch(100% 0 0);
+	/* --color-primary: oklch(55% 0.22 260);
+	--color-primary-hover: oklch(48% 0.22 260);
+	--color-on-primary: oklch(100% 0 0); */
+
+	/* Primary Tonal */
+	--color-primary-tonal: oklch(95% 0.05 260);
+	--color-primary-tonal-hover: oklch(90% 0.08 260);
+	--color-on-primary-tonal: oklch(35% 0.15 260);
+
+	/* SECONDARY — Vivid Orange #ff6600 */
+	--color-secondary: oklch(67% 0.22 45);
+	--color-secondary-hover: oklch(60% 0.22 45);
+	--color-on-secondary: oklch(100% 0 0);
+
+	/* Secondary Tonal */
+	--color-secondary-tonal: oklch(93% 0.05 45);
+	--color-secondary-tonal-hover: oklch(89% 0.08 45);
+	--color-on-secondary-tonal: oklch(38% 0.15 45);
+
+	/* DESTRUCTIVE — Red */
+	--color-destructive: oklch(55% 0.18 27);
+	--color-destructive-hover: oklch(48% 0.18 27);
+	--color-on-destructive: oklch(100% 0 0);
+
+	--color-destructive-tonal: oklch(92% 0.04 25);
+	--color-destructive-tonal-hover: oklch(88% 0.06 25);
+	--color-on-destructive-tonal: oklch(38% 0.14 27);
+
+	/* SUCCESS — Green */
+	--color-success: oklch(62% 0.2 155);
+	--color-success-hover: oklch(56% 0.12 155);
+	--color-on-success: oklch(18% 0 0);
+
+	--color-success-tonal: oklch(92% 0.04 155);
+	--color-success-tonal-hover: oklch(88% 0.06 155);
+	--color-on-success-tonal: oklch(32% 0.1 155);
+
+	/* MUTED */
+	--color-surface-foreground-muted: oklch(60% 0 0);
+
+	/* SURFACES */
+	--color-background: oklch(96% 0 0);
+	--color-background-hover: oklch(92% 0 0);
+	--color-foreground: oklch(16% 0 0);
+	--color-surface: oklch(100% 0 0);
+	--color-surface-hover: oklch(96% 0 0);
+	--color-on-surface: oklch(16% 0 0);
+
+	/* BORDERS */
+	/* --color-surface-bo */
+
+	/* NAVIGATION */
+	--color-nav-bg: oklch(10% 0 0 / 0.9);
+	--color-nav-bg-hover: oklch(100% 0 0 / 0.15);
+	--color-nav-bg-muted: oklch(70% 0 0 / 0.15);
+	--color-nav-foreground: oklch(100% 0 0);
+	--color-nav-foreground-muted: oklch(60% 0 0);
+	--color-nav-pill-bg: oklch(100% 0 0);
+	--color-nav-pill-foreground: var(--color-foreground);
+	--color-nav-border: oklch(100% 0 0 / 0.15);
+
+	/* FONTS */
+	--font-default: 'Figtree Variable', sans-serif;
+	--font-display: 'Plus Jakarta Sans Variable', sans-serif;
+}
+
+body {
+	font-family: 'Figtree Variable', sans-serif;
+	font-size: 1.05rem;
+	user-select: none;
+}

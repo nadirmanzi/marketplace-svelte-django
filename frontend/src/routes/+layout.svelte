@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { auth_state, setAuth, revokeAuth } from '$lib/client/state/auth.svelte';
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '$lib/assets/white-logo.svg';
 
 	let { data, children } = $props();
 
@@ -14,7 +14,10 @@
 	});
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<svelte:head>
+	<link rel="icon" href={favicon} />
+	<title>Marketplace</title>
+</svelte:head>
 
 <main class="h-dvh w-screen bg-background text-foreground">
 	{@render children()}

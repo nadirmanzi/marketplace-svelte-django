@@ -5,23 +5,18 @@
 	 * Manages the top bar, the mega-menu expansion, and the search overlay state.
 	 * ───────────────────────────────────────────────────────────────────────────────
 	 */
+
 	import MainNavLinks from './main-nav-links.svelte';
-	import WhiteLogo from '$lib/assets/white-logo.svg';
 	import Search from '@tabler/icons-svelte-runes/icons/search';
 	import ShoppingBag from '@tabler/icons-svelte-runes/icons/shopping-bag';
 	import AnimatedPillGroup from '$lib/components/ui/animated-pill-group.svelte';
 	import AnimatedPillItem from '$lib/components/ui/animated-pill-item.svelte';
-	import { fade, fly } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 	import type { Snippet } from 'svelte';
 	import SearchBar from './search-bar.svelte';
 	import Sheet from '$lib/components/ui/sheet.svelte';
 	import Button from '$lib/components/ui/button.svelte';
-	import UserPlus from '@tabler/icons-svelte-runes/icons/user-plus';
-	import UserMinus from '@tabler/icons-svelte-runes/icons/user-minus';
-	import { auth_state, setAuth, revokeAuth } from '$lib/client/state/auth.svelte';
-	import { enhance } from '$app/forms';
 	import Logo from '../logo.svelte';
-	import { fadeScale } from '$lib/utils/transitions.svelte';
 
 	// ─── ANIMATION CONSTANTS ─────────────────────────────────────────────────────
 	// Linear-to-curved easing for a "premium" feel.
@@ -52,8 +47,10 @@
 	let isCrossHover = $state(false); // Tracks if moving between links
 	let isSearchOpen = $state(false); // Controls search overlay
 	let isCartOpen = $state(false); // Controls shopping cart sheet
+	let isUserMenuOpen = $state(false); // Controls auth dropdown state
 
 	// ─── HEIGHT ANIMATION LOGIC ──────────────────────────────────────────────────
+
 	// Dynamically measures the content container to animate the nav drawer's height.
 	let contentElement = $state<HTMLElement | null>(null);
 	let currentHeight = $state(0);
@@ -78,7 +75,7 @@
 
 	/** Closes active menus when clicking anywhere outside the navigation boundary */
 	function handleGlobalClick(e: MouseEvent) {
-		if (isOpen || isSearchOpen) {
+		if (isOpen || isSearchOpen || isUserMenuOpen) {
 			const target = e.target as Node;
 			// If target was removed from DOM (like a cleared button), ignore outside click logic
 			if (!document.contains(target)) return;
@@ -87,6 +84,7 @@
 				isOpen = false;
 				isSearchOpen = false;
 				isCartOpen = false;
+				isUserMenuOpen = false;
 				activeLink = null;
 			}
 		}
@@ -100,6 +98,7 @@
 			isOpen = false;
 			isSearchOpen = false;
 			isCartOpen = false;
+			isUserMenuOpen = false;
 			activeLink = null;
 			isClosing = false;
 		}
@@ -133,12 +132,14 @@
 			if (isOpen) {
 				isOpen = false;
 				activeLink = null;
+				isUserMenuOpen = false;
 				// Smooth transition from mega-menu to search
 				hoverTimeout = setTimeout(() => {
 					isSearchOpen = true;
 				}, 250);
 			} else {
 				isSearchOpen = true;
+				isUserMenuOpen = false;
 			}
 		}
 	}
@@ -185,9 +186,10 @@
 
 	/** Toggles the Shopping Cart Sheet and closes other active views */
 	function handleCartClick() {
-		// Close mega-menu or search before opening the sheet
+		// Close mega-menu, search, and user menu before opening the sheet
 		isOpen = false;
 		isSearchOpen = false;
+		isUserMenuOpen = false;
 		activeLink = null;
 
 		isCartOpen = !isCartOpen;
@@ -240,16 +242,6 @@
 					onclick={handleCartClick}
 				>
 					<ShoppingBag stroke={1.5} />
-				</AnimatedPillItem>
-				<AnimatedPillItem id="auth" class=" text-white [&_svg]:size-5">
-					{#if auth_state.is_authenticated}
-						<form action="/auth/logout" method="POST" use:enhance>
-							<button type="submit" class="flex items-center space-x-2">
-								<UserPlus stroke={1.5} class="text-success" />
-								<p class="text-sm">Logout</p>
-							</button>
-						</form>
-					{/if}
 				</AnimatedPillItem>
 			</AnimatedPillGroup>
 		</section>
