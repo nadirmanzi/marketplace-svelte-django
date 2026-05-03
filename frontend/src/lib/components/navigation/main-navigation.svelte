@@ -243,6 +243,24 @@
 				>
 					<ShoppingBag stroke={1.5} />
 				</AnimatedPillItem>
+
+				<!-- <DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						<AnimatedPillItem id="user-menu" class="size-10 text-nav-foreground [&_svg]:size-5">
+							<User stroke={1.5} />
+						</AnimatedPillItem>
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content context="surface">
+						<DropdownMenu.Group>
+							<DropdownMenu.Label>My Account</DropdownMenu.Label>
+							<DropdownMenu.Separator />
+							<DropdownMenu.Item>Profile</DropdownMenu.Item>
+							<DropdownMenu.Item>Billing</DropdownMenu.Item>
+							<DropdownMenu.Item>Team</DropdownMenu.Item>
+							<DropdownMenu.Item>Subscription</DropdownMenu.Item>
+						</DropdownMenu.Group>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root> -->
 			</AnimatedPillGroup>
 		</section>
 	</nav>
@@ -252,7 +270,7 @@
 		Smoothly transitions height and contains either Link content or Search.
 	-->
 	<div
-		class="overflow-hidden border-t-[1.5px] border-white/5 shadow-none transition-[height] duration-500 {isOpen ||
+		class="overflow-hidden border-t-[1.5px] shadow-none transition-[height] duration-500 {isOpen ||
 		isSearchOpen
 			? ' ease-[cubic-bezier(0.16,1,0.3,1)]'
 			: ' ease-[cubic-bezier(0.7,0,0.84,0)]'}"

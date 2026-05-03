@@ -5,9 +5,7 @@
 </script>
 
 <main class="flex flex-col">
-	<header class="h-20">
-		<MainNavigation />
-	</header>
+	<MainNavigation />
 
 	<div class="flex-1 overflow-y-auto">
 		{@render children?.()}

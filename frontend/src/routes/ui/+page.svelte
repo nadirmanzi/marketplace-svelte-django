@@ -1,28 +1,11 @@
 <script lang="ts">
 	import Button from '$lib/components/ui/button.svelte';
-	import Input from '$lib/components/ui/input.svelte';
-	import Home2 from '@tabler/icons-svelte-runes/icons/home-2';
-	import Search from '@tabler/icons-svelte-runes/icons/search';
-	import ShoppingBag from '@tabler/icons-svelte-runes/icons/shopping-bag';
 	import Heart from '@tabler/icons-svelte-runes/icons/heart';
 	import Trash from '@tabler/icons-svelte-runes/icons/trash';
 	import Check from '@tabler/icons-svelte-runes/icons/check';
 	import Plus from '@tabler/icons-svelte-runes/icons/plus';
 	import ArrowRight from '@tabler/icons-svelte-runes/icons/arrow-right';
 	import Settings from '@tabler/icons-svelte-runes/icons/settings';
-	import Download from '@tabler/icons-svelte-runes/icons/download';
-	import Mail from '@tabler/icons-svelte-runes/icons/mail';
-	import Eye from '@tabler/icons-svelte-runes/icons/eye';
-	import EyeOff from '@tabler/icons-svelte-runes/icons/eye-off';
-	import User from '@tabler/icons-svelte-runes/icons/user';
-	import X from '@tabler/icons-svelte-runes/icons/x';
-
-	let showPassword = $state(false);
-	let searchValue = $state('');
-
-	const colors = ['primary', 'secondary', 'destructive', 'success'] as const;
-	const variants = ['filled', 'tonal', 'outline', 'ghost'] as const;
-	const sizes = ['sm', 'md', 'lg'] as const;
 
 	const colorTokens = [
 		{
@@ -168,7 +151,7 @@
 	<title>Design System — UI Showcase</title>
 </svelte:head>
 
-<div class="space-y-24">
+<div class="space-y-24 p-8 sm:p-12">
 	<!-- ─── HEADER ─── -->
 	<header class="space-y-4 text-center">
 		<div
@@ -340,6 +323,7 @@
 		</div>
 	</section>
 
+
 	<!-- ═══════════════════════════════════════════ -->
 	<!-- SECTION: Color Palette                      -->
 	<!-- ═══════════════════════════════════════════ -->
@@ -354,13 +338,13 @@
 		<div
 			class="grid grid-cols-1 gap-8 rounded-[2.5rem] bg-surface p-8 shadow-sm ring-1 ring-surface-hover/50 sm:p-12 md:grid-cols-2"
 		>
-			{#each colorTokens as group}
+			{#each colorTokens as group (group.tokens[0].name)}
 				<div class="space-y-4">
 					<h3 class="text-sm font-bold tracking-widest text-foreground/40 uppercase">
 						{group.group}
 					</h3>
 					<div class="grid grid-cols-2 gap-4">
-						{#each group.tokens as token}
+						{#each group.tokens as token (token.name)}
 							<div
 								class="overflow-hidden rounded-2xl shadow-sm ring-1 ring-foreground/5 transition-transform hover:-translate-y-0.5"
 							>

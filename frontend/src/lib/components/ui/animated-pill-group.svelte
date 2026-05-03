@@ -8,8 +8,19 @@
 	 */
 	import { setContext } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
+	import { cn } from '$lib/utils';
 
-	let { color = 'bg-nav-hover', pillClass = 'rounded-full', children } = $props();
+	let {
+		color = 'bg-nav-hover',
+		pillClass = 'rounded-full',
+		direction = 'horizontal',
+		children
+	}: {
+		color?: string;
+		pillClass?: string;
+		direction?: 'horizontal' | 'vertical';
+		children: import('svelte').Snippet;
+	} = $props();
 
 	// ─── STATE ───────────────────────────────────────────────────────────────────
 	let mounted = $state(false);
@@ -84,7 +95,10 @@
 
 <div
 	bind:this={container}
-	class="relative flex h-full items-center justify-center"
+	class={cn(
+		'relative flex h-full items-center',
+		direction === 'vertical' ? 'w-full flex-col' : 'justify-center'
+	)}
 	onmouseenter={() => (isGroupHovered = true)}
 	onmouseleave={() => {
 		isGroupHovered = false;
@@ -110,7 +124,7 @@
 	{/if}
 
 	<!-- Link List / Children -->
-	<div class="relative z-10 flex h-full w-full">
+	<div class={cn('relative z-10 flex h-full w-full', direction === 'vertical' ? 'flex-col' : '')}>
 		{@render children()}
 	</div>
 </div>

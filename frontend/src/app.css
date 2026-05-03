@@ -62,7 +62,7 @@
 	/* --color-surface-bo */
 
 	/* NAVIGATION */
-	--color-nav-bg: oklch(10% 0 0 / 0.9);
+	--color-nav-bg: oklch(0% 0 0 / 0.85);
 	--color-nav-bg-hover: oklch(100% 0 0 / 0.15);
 	--color-nav-bg-muted: oklch(70% 0 0 / 0.15);
 	--color-nav-foreground: oklch(100% 0 0);
@@ -70,6 +70,7 @@
 	--color-nav-pill-bg: oklch(100% 0 0);
 	--color-nav-pill-foreground: var(--color-foreground);
 	--color-nav-border: oklch(100% 0 0 / 0.15);
+	--color-nav-dropdown-bg: oklch(100% 0 0 / 0.85);
 
 	/* FONTS */
 	--font-default: 'Figtree Variable', sans-serif;
