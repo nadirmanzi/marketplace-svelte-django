@@ -8,19 +8,7 @@ from pathlib import Path
 
 def main():
     """Run administrative tasks."""
-    # Auto-detect which settings module to use based on .env file presence
-    # This allows seamless switching between local and production environments
-    backend_dir = Path(__file__).resolve().parent
-
-    if (backend_dir / ".env.local").exists():
-        settings_module = "config.settings.local"
-    elif (backend_dir / ".env.production").exists():
-        settings_module = "config.settings.production"
-    else:
-        # Fallback to base settings if no environment file found
-        settings_module = "config.settings.base"
-
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", settings_module)
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
     try:
         from django.core.management import execute_from_command_line

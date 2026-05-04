@@ -21,16 +21,16 @@ export const nodes = [
 export const server_loads = [0];
 
 export const dictionary = {
-		"/(main)": [~8,[3]],
-		"/auth/login": [~7,[2]],
-		"/auth/logout": [~5,[2]],
-		"/auth/signup": [~6,[2]],
-		"/(main)/categories": [~9,[3]],
-		"/(main)/orders": [10,[3]],
-		"/ui": [11,[4]],
-		"/ui/button": [14,[4]],
-		"/ui/input": [12,[4]],
-		"/ui/sheet": [13,[4]]
+		"/(main)": [~5,[2]],
+		"/auth/login": [~14,[4]],
+		"/auth/logout": [~13,[4]],
+		"/auth/signup": [~12,[4]],
+		"/(main)/categories": [~6,[2]],
+		"/(main)/orders": [7,[2]],
+		"/ui": [8,[3]],
+		"/ui/button": [10,[3]],
+		"/ui/input": [9,[3]],
+		"/ui/sheet": [11,[3]]
 	};
 
 export const hooks = {

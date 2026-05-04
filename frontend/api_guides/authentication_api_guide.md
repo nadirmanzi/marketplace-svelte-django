@@ -62,11 +62,11 @@ Creates a new account and automatically logs the user in.
   - **Body**: (Wrapped `EmbeddedUser` object)
     ```json
     {
-      "user": {
-        "user_id": "550e8400-e29b-41d4-a716-446655440000",
-        "email": "user@example.com",
-        "full_name": "John Doe"
-      }
+    	"user": {
+    		"user_id": "550e8400-e29b-41d4-a716-446655440000",
+    		"email": "user@example.com",
+    		"full_name": "John Doe"
+    	}
     }
     ```
   - **Cookies**: Sets `access_token` and `refresh_token`.
@@ -166,16 +166,16 @@ Retrieves the full profile of the logged-in user.
   - **Body**:
     ```json
     {
-      "user": {
-        "user_id": "550e8400-e29b-41d4-a716-446655440000",
-        "email": "user@example.com",
-        "full_name": "John Doe",
-        "telephone_number": "+1234567890",
-        "password_changed_at": "2026-04-10T14:30:00Z",
-        "password_expired": false,
-        "created_at": "2026-04-10T14:30:00Z",
-        "updated_at": "2026-04-10T14:30:00Z"
-      }
+    	"user": {
+    		"user_id": "550e8400-e29b-41d4-a716-446655440000",
+    		"email": "user@example.com",
+    		"full_name": "John Doe",
+    		"telephone_number": "+1234567890",
+    		"password_changed_at": "2026-04-10T14:30:00Z",
+    		"password_expired": false,
+    		"created_at": "2026-04-10T14:30:00Z",
+    		"updated_at": "2026-04-10T14:30:00Z"
+    	}
     }
     ```
 
@@ -184,44 +184,48 @@ Retrieves the full profile of the logged-in user.
 Used by administrators to manage account lifecycles.
 
 #### 3.8.1. Deactivate User
+
 - **URL**: `POST /users/management/{pk}/deactivate/`
 - **Response**:
   ```json
   {
-    "is_active": false,
-    "user": { "user_id": "...", "email": "...", "full_name": "..." }
+  	"is_active": false,
+  	"user": { "user_id": "...", "email": "...", "full_name": "..." }
   }
   ```
 
 #### 3.8.2. Activate User
+
 - **URL**: `POST /users/management/{pk}/activate/`
 - **Response**:
   ```json
   {
-    "is_active": true,
-    "user": { "user_id": "...", "email": "...", "full_name": "..." }
+  	"is_active": true,
+  	"user": { "user_id": "...", "email": "...", "full_name": "..." }
   }
   ```
 
 #### 3.8.3. Soft Delete User
+
 - **URL**: `POST /users/management/{pk}/soft-delete/`
 - **Response**:
   ```json
   {
-    "is_soft_deleted": true,
-    "soft_deleted_at": "2026-04-21T16:00:00Z",
-    "user": { "user_id": "...", "email": "...", "full_name": "..." }
+  	"is_soft_deleted": true,
+  	"soft_deleted_at": "2026-04-21T16:00:00Z",
+  	"user": { "user_id": "...", "email": "...", "full_name": "..." }
   }
   ```
 
 #### 3.8.4. Set Staff/Superuser Status
+
 - **URL**: `POST /users/management/{pk}/set-staff-status/`
 - **Body**: `{ "is_staff": true }`
 - **Response**:
   ```json
   {
-    "is_staff": true,
-    "user": { "user_id": "...", "email": "...", "full_name": "..." }
+  	"is_staff": true,
+  	"user": { "user_id": "...", "email": "...", "full_name": "..." }
   }
   ```
 
@@ -341,29 +345,29 @@ Example: Password Expiration from Middleware.
 ## 6. Data Models
 
 ### 6.1. UserProfile
- 
- This object is returned by the `Me` endpoint inside the `user` key.
- 
- | Field                 | Type     | Description                                      |
- | :-------------------- | :------- | :----------------------------------------------- |
- | `user_id`             | UUID     | Unique identifier (v4) for the user.             |
- | `email`               | String   | User's email address (normalized).               |
- | `full_name`           | String   | User's full name.                                |
- | `telephone_number`    | String   | E.164 formatted phone number or `null`.          |
- | `password_changed_at` | DateTime | Last time the password was successfully changed. |
- | `password_expired`    | Boolean  | Read-only flag indicating current expiry status. |
- | `created_at`          | DateTime | Timestamp of account creation.                   |
- | `updated_at`          | DateTime | Timestamp of last account update.                |
- 
- ### 6.2. EmbeddedUser
- 
- A minimal user representation used for associations (e.g., in Login, Signup, or as a product owner).
 
- | Field     | Type   | Description                          |
- | :-------- | :----- | :----------------------------------- |
- | `user_id` | UUID   | Unique identifier (v4) for the user. |
- | `email`   | String | User's email address.                |
- | `full_name`| String | User's full name.                    |
+This object is returned by the `Me` endpoint inside the `user` key.
+
+| Field                 | Type     | Description                                      |
+| :-------------------- | :------- | :----------------------------------------------- |
+| `user_id`             | UUID     | Unique identifier (v4) for the user.             |
+| `email`               | String   | User's email address (normalized).               |
+| `full_name`           | String   | User's full name.                                |
+| `telephone_number`    | String   | E.164 formatted phone number or `null`.          |
+| `password_changed_at` | DateTime | Last time the password was successfully changed. |
+| `password_expired`    | Boolean  | Read-only flag indicating current expiry status. |
+| `created_at`          | DateTime | Timestamp of account creation.                   |
+| `updated_at`          | DateTime | Timestamp of last account update.                |
+
+### 6.2. EmbeddedUser
+
+A minimal user representation used for associations (e.g., in Login, Signup, or as a product owner).
+
+| Field       | Type   | Description                          |
+| :---------- | :----- | :----------------------------------- |
+| `user_id`   | UUID   | Unique identifier (v4) for the user. |
+| `email`     | String | User's email address.                |
+| `full_name` | String | User's full name.                    |
 
 ---
 

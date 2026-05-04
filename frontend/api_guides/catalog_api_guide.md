@@ -32,6 +32,7 @@ graph TD
 ## 3. Category API
 
 ### 3.1. List Categories (Flat)
+
 Retrieves a flat list of categories, typically for admin tables or simple selection.
 
 - **URL**: `GET /catalog/categories/`
@@ -44,47 +45,49 @@ Retrieves a flat list of categories, typically for admin tables or simple select
 - **Response (200 OK)**:
   ```json
   {
-    "categories": [
-      {
-        "category_id": "uuid",
-        "name": "Electronics",
-        "slug": "electronics",
-        "description": "Gadgets and more",
-        "image": "url/null",
-        "parent_id": "uuid/null",
-        "depth": 0,
-        "subcategory_count": 5
-      }
-    ]
+  	"categories": [
+  		{
+  			"category_id": "uuid",
+  			"name": "Electronics",
+  			"slug": "electronics",
+  			"description": "Gadgets and more",
+  			"image": "url/null",
+  			"parent_id": "uuid/null",
+  			"depth": 0,
+  			"subcategory_count": 5
+  		}
+  	]
   }
   ```
 
 ### 3.2. Category Tree
+
 Retrieves the full hierarchical structure, optimized for navigation menus.
 
 - **URL**: `GET /catalog/categories/tree/` (Note: Implemented as a viewset action)
 - **Response (200 OK)**: Nested `children` arrays, wrapped in `{"categories": [...]}`.
 
 ### 3.3. Category Attributes
+
 Retrieves the attributes that should be collected when creating a product in this category.
 
 - **URL**: `GET /catalog/categories/{category_id}/attributes/`
 - **Response (200 OK)**:
   ```json
   {
-    "attributes": [
-      {
-        "attribute": {
-          "attribute_id": "uuid",
-          "name": "Screen Size",
-          "slug": "screen-size",
-          "input_type": "number",
-          "unit": "inches",
-          "options": []
-        },
-        "order": 1
-      }
-    ]
+  	"attributes": [
+  		{
+  			"attribute": {
+  				"attribute_id": "uuid",
+  				"name": "Screen Size",
+  				"slug": "screen-size",
+  				"input_type": "number",
+  				"unit": "inches",
+  				"options": []
+  			},
+  			"order": 1
+  		}
+  	]
   }
   ```
 
@@ -93,6 +96,7 @@ Retrieves the attributes that should be collected when creating a product in thi
 ## 4. Product Discovery API (Public)
 
 ### 4.1. List Products
+
 Public listing of published products. Includes active variants by default.
 
 - **URL**: `GET /catalog/products/`
@@ -130,6 +134,7 @@ Public listing of published products. Includes active variants by default.
   ```
 
 ### 3.2. Product Detail
+
 Retrieves full details of a single product using its slug.
 
 - **URL**: `GET /catalog/products/{slug}/`
@@ -142,24 +147,26 @@ Retrieves full details of a single product using its slug.
 Authenticated endpoints for creating and managing your own products.
 
 ### 5.1. Create Product
+
 Creates a product "blueprint".
 
 - **URL**: `POST /catalog/products/manage/`
 - **Body**:
   ```json
   {
-    "name": "Smartphone X",
-    "description": "Latest flagship",
-    "base_price": "999.00",
-    "category": "uuid",
-    "attributes": {
-      "screen-size": 6.7,
-      "brand": "TechCo"
-    }
+  	"name": "Smartphone X",
+  	"description": "Latest flagship",
+  	"base_price": "999.00",
+  	"category": "uuid",
+  	"attributes": {
+  		"screen-size": 6.7,
+  		"brand": "TechCo"
+  	}
   }
   ```
 
 ### 5.2. Archive/Publish
+
 Products are archived instead of hard-deleted to preserve order history.
 
 - **Archive**: `POST /catalog/products/manage/{id}/archive/`
@@ -172,6 +179,7 @@ Products are archived instead of hard-deleted to preserve order history.
 Variants represent the actual physical items.
 
 ### 6.1. Adjust Stock
+
 Atomically increase or decrease stock.
 
 - **URL**: `POST /catalog/variants/manage/{id}/adjust-stock/`
@@ -184,34 +192,34 @@ Atomically increase or decrease stock.
 
 ### 7.1. Product blueprint
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `product_id` | UUID | Unique identifier. |
-| `name` | String | Product title. |
-| `slug` | String | URL-friendly identifier. |
-| `user` | EmbeddedUser | Owner information. |
-| `created_at` | DateTime | Creation timestamp. |
-| `updated_at` | DateTime | Last update timestamp. |
+| Field        | Type         | Description              |
+| :----------- | :----------- | :----------------------- |
+| `product_id` | UUID         | Unique identifier.       |
+| `name`       | String       | Product title.           |
+| `slug`       | String       | URL-friendly identifier. |
+| `user`       | EmbeddedUser | Owner information.       |
+| `created_at` | DateTime     | Creation timestamp.      |
+| `updated_at` | DateTime     | Last update timestamp.   |
 
 ### 7.2. Attribute Values
 
 Attributes are returned as a unified list regardless of their internal storage (text, number, etc).
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `attribute_id`| UUID | ID of the definition. |
-| `name` | String | Display name. |
-| `slug` | String | Internal ID for frontend logic. |
-| `value` | Mixed | Can be String, Number, Boolean, or Array (for multiselect). |
+| Field          | Type   | Description                                                 |
+| :------------- | :----- | :---------------------------------------------------------- |
+| `attribute_id` | UUID   | ID of the definition.                                       |
+| `name`         | String | Display name.                                               |
+| `slug`         | String | Internal ID for frontend logic.                             |
+| `value`        | Mixed  | Can be String, Number, Boolean, or Array (for multiselect). |
 
 ---
 
 ## 8. Error Codes (Catalog Specific)
 
-| Status | Code | Meaning |
-| :--- | :--- | :--- |
-| 400 | `insufficient_stock` | Attempted to reduce stock below zero. |
-| 400 | `duplicate_sku` | SKU is already in use by another variant. |
-| 400 | `invalid_attribute` | Attribute provided does not belong to the category. |
-| 403 | `not_owner` | Attempted to edit a product owned by another user. |
-| 404 | `category_not_found` | Provided category ID is invalid. |
+| Status | Code                 | Meaning                                             |
+| :----- | :------------------- | :-------------------------------------------------- |
+| 400    | `insufficient_stock` | Attempted to reduce stock below zero.               |
+| 400    | `duplicate_sku`      | SKU is already in use by another variant.           |
+| 400    | `invalid_attribute`  | Attribute provided does not belong to the category. |
+| 403    | `not_owner`          | Attempted to edit a product owned by another user.  |
+| 404    | `category_not_found` | Provided category ID is invalid.                    |

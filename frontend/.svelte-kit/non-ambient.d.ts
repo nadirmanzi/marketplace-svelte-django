@@ -27,7 +27,7 @@ export {};
 
 declare module "$app/types" {
 	export interface AppTypes {
-		RouteId(): "/(main)" | "/" | "/auth" | "/auth/login" | "/auth/logout" | "/auth/signup" | "/(main)/categories" | "/(main)/orders" | "/ui" | "/ui/button" | "/ui/dropdown" | "/ui/input" | "/ui/sheet";
+		RouteId(): "/(main)" | "/" | "/auth" | "/auth/login" | "/auth/logout" | "/auth/signup" | "/(main)/categories" | "/(main)/orders" | "/ui" | "/ui/button" | "/ui/input" | "/ui/sheet";
 		RouteParams(): {
 			
 		};
@@ -42,7 +42,6 @@ declare module "$app/types" {
 			"/(main)/orders": Record<string, never>;
 			"/ui": Record<string, never>;
 			"/ui/button": Record<string, never>;
-			"/ui/dropdown": Record<string, never>;
 			"/ui/input": Record<string, never>;
 			"/ui/sheet": Record<string, never>
 		};

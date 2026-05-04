@@ -62,7 +62,10 @@
 		>
 			<Carousel.ItemGroup class="h-full w-full">
 				{#each slides as slide, i (i)}
-					<Carousel.Item index={i} class="group h-full flex-col items-center space-y-2 rounded-lg overflow-hidden ">
+					<Carousel.Item
+						index={i}
+						class="group h-full flex-col items-center space-y-2 overflow-hidden rounded-lg "
+					>
 						<a href={slide.href} class="block h-[20rem] overflow-hidden rounded-2xl">
 							<img
 								src={slide.image ?? ''}

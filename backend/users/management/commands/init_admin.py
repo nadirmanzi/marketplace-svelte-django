@@ -13,7 +13,7 @@ class Command(BaseCommand):
         email = os.environ.get('DJANGO_SUPERUSER_EMAIL')
         password = os.environ.get('DJANGO_SUPERUSER_PASSWORD')
         full_name = os.environ.get('DJANGO_SUPERUSER_FULL_NAME', 'Admin')
-        phone = os.environ.get('DJANGO_SUPERUSER_TELEPHONE', '+1234567890')
+        phone = os.environ.get('DJANGO_SUPERUSER_TELEPHONE', '+250786802977')
 
         if not email or not password:
             self.stdout.write(self.style.ERROR(

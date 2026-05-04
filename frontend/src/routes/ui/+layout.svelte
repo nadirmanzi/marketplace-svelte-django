@@ -37,7 +37,9 @@
 	</aside>
 
 	<!-- Main Content Area -->
-	<main class="flex flex-1 flex-col items-center justify-start overflow-y-auto bg-background py-16 px-6 relative h-screen">
+	<main
+		class="relative flex h-screen flex-1 flex-col items-center justify-start overflow-y-auto bg-background px-6 py-16"
+	>
 		<div class="w-full max-w-5xl">
 			{@render children()}
 		</div>

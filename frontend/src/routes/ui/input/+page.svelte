@@ -21,7 +21,9 @@
 		<div class="space-y-4">
 			<h1 class="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">Input</h1>
 			<p class="max-w-2xl text-xl leading-relaxed text-foreground/60">
-				A pure, context-aware input pill. No complex variants—just clean architecture that automatically calculates the perfect background, hover, and border interaction depending on its surface.
+				A pure, context-aware input pill. No complex variants—just clean architecture that
+				automatically calculates the perfect background, hover, and border interaction depending on
+				its surface.
 			</p>
 		</div>
 	</header>
@@ -74,7 +76,9 @@
 		<div class="space-y-2">
 			<h2 class="text-2xl font-bold tracking-tight text-foreground">Strict Context Rendering</h2>
 			<p class="max-w-3xl text-sm text-foreground/60">
-				The component has no <code>variant</code> prop. Instead, you declare the <code>context</code> (the container it lives in) and it strictly enforces perfect contrast. Hovering adds subtle grey fills, and active states turn the borders stark black.
+				The component has no <code>variant</code> prop. Instead, you declare the
+				<code>context</code> (the container it lives in) and it strictly enforces perfect contrast. Hovering
+				adds subtle grey fills, and active states turn the borders stark black.
 			</p>
 		</div>
 
@@ -85,11 +89,7 @@
 					class="flex min-h-[250px] flex-1 flex-col items-center justify-center rounded-4xl border-2 border-dashed border-foreground/10 bg-background p-8 shadow-inner ring-1 ring-foreground/10"
 				>
 					<div class="w-full max-w-xs space-y-4">
-						<Input
-							context="background"
-							placeholder="Focus me..."
-							label="Background Default"
-						>
+						<Input context="background" placeholder="Focus me..." label="Background Default">
 							{#snippet leading()}<User />{/snippet}
 						</Input>
 					</div>
@@ -97,7 +97,9 @@
 				<div class="px-2">
 					<h3 class="font-bold text-foreground">Context: <code>"background"</code></h3>
 					<p class="mt-1 text-xs leading-relaxed text-foreground/60">
-						When placed directly on the application's base grey surface <code>bg-background</code>, the input is pure white. Hovering adds a slight grey fill. Focus punches to a solid black border.
+						When placed directly on the application's base grey surface <code>bg-background</code>,
+						the input is pure white. Hovering adds a slight grey fill. Focus punches to a solid
+						black border.
 					</p>
 				</div>
 			</div>
@@ -108,11 +110,7 @@
 					class="flex min-h-[250px] flex-1 flex-col items-center justify-center rounded-4xl bg-surface p-8 shadow-xl ring-1 ring-foreground/5"
 				>
 					<div class="w-full max-w-xs space-y-4">
-						<Input
-							context="surface"
-							placeholder="Focus me..."
-							label="Surface Default"
-						>
+						<Input context="surface" placeholder="Focus me..." label="Surface Default">
 							{#snippet leading()}<User />{/snippet}
 						</Input>
 					</div>
@@ -120,7 +118,8 @@
 				<div class="px-2">
 					<h3 class="font-bold text-foreground">Context: <code>"surface"</code></h3>
 					<p class="mt-1 text-xs leading-relaxed text-foreground/60">
-						When placed inside a white card <code>bg-surface</code>, the input adopts a grey fill to step back from the card surface. Hovering darkens the grey slightly.
+						When placed inside a white card <code>bg-surface</code>, the input adopts a grey fill to
+						step back from the card surface. Hovering darkens the grey slightly.
 					</p>
 				</div>
 			</div>
@@ -128,14 +127,10 @@
 			<!-- On Dark Foreground -->
 			<div class="flex flex-col space-y-4 lg:col-span-2">
 				<div
-					class="flex w-full flex-col items-center justify-center rounded-4xl bg-foreground p-8 md:p-12 shadow-2xl"
+					class="flex w-full flex-col items-center justify-center rounded-4xl bg-foreground p-8 shadow-2xl md:p-12"
 				>
 					<div class="w-full max-w-md">
-						<Input
-							context="dark"
-							placeholder="Search global registry..."
-							label="Dark Default"
-						>
+						<Input context="dark" placeholder="Search global registry..." label="Dark Default">
 							{#snippet leading()}<Search />{/snippet}
 						</Input>
 					</div>
@@ -143,7 +138,9 @@
 				<div class="px-2">
 					<h3 class="font-bold text-foreground">Context: <code>"dark"</code> (e.g. Navigation)</h3>
 					<p class="mt-1 max-w-3xl text-xs leading-relaxed text-foreground/60">
-						When placed on stark black surfaces like the main top navigation, the input retains a white/grey pill format but adjusts its internal label/helper tokens to be legible against the black exterior.
+						When placed on stark black surfaces like the main top navigation, the input retains a
+						white/grey pill format but adjusts its internal label/helper tokens to be legible
+						against the black exterior.
 					</p>
 				</div>
 			</div>
@@ -196,7 +193,8 @@
 		<div class="space-y-2">
 			<h2 class="text-2xl font-bold tracking-tight text-foreground">Sizing</h2>
 			<p class="max-w-3xl text-sm text-foreground/60">
-				Inputs conform to three rigid heights tying directly to typographic baselines. Flanking icons scale natively alongside text.
+				Inputs conform to three rigid heights tying directly to typographic baselines. Flanking
+				icons scale natively alongside text.
 			</p>
 		</div>
 
